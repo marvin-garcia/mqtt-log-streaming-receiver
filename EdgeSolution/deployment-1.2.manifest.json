@@ -6,9 +6,7 @@
         "runtime": {
           "type": "docker",
           "settings": {
-            "minDockerVersion": "v1.25",
-            "loggingOptions": "",
-            "registryCredentials": {}
+            "minDockerVersion": "v1.25"
           }
         },
         "systemModules": {

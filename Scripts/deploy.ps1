@@ -738,48 +738,15 @@ function New-ELMSEnvironment() {
     #endregion
 
     #region edge deployments
-    if ($script:create_iot_hub) {
+    # Create main deployment
+    Write-Host "`r`nCreating base IoT edge device deployment"
 
-        # Create main deployment
-        Write-Host "`r`nCreating main IoT edge device deployment"
-
-        az iot edge set-modules `
-            --device-id $script:vm_name `
-            --hub-name $script:iot_hub_name `
-            --content "$($root_path)/EdgeSolution/deployment-1.1.manifest.json" | Out-Null
-
-        $priority = 0
-
-        # Create monitoring deployment
-        # if ($script:enable_monitoring) {
-        #     $deployment_name = "edge-monitoring"
-        #     $priority += 1
-            
-        #     Write-Host "`r`nCreating IoT edge monitoring layered deployment $deployment_name"
-
-        #     az iot edge deployment create `
-        #         --layered `
-        #         -d "$deployment_name" `
-        #         --hub-name $script:iot_hub_name `
-        #         --content $monitoring_manifest `
-        #         --target-condition=$script:deployment_condition `
-        #         --priority $priority | Out-Null
-        # }
-
-        # # Create logging deployment
-        # $deployment_name = "sample-logging"
-        # $priority += 1
-        
-        # Write-Host "`r`nCreating IoT edge logging layered deployment $deployment_name"
-
-        # az iot edge deployment create `
-        #     --layered `
-        #     -d "$deployment_name" `
-        #     --hub-name $script:iot_hub_name `
-        #     --content "$($root_path)/EdgeSolution/logging.deployment.json" `
-        #     --target-condition=$script:deployment_condition `
-        #     --priority $priority | Out-Null
-    }
+    $deployment_schema = "1.2"
+    az iot edge deployment create `
+        -d "base-deployment" `
+        --hub-name $script:iot_hub_name `
+        --content "$($root_path)/EdgeSolution/deployment-$($deployment_schema).manifest.json" `
+        --target-condition=$script:deployment_condition | Out-Null
     #endregion
 
     #region function app
@@ -869,9 +836,11 @@ function New-ELMSEnvironment() {
 
     if ($script:create_iot_hub) {
         Write-Host
-        Write-Host -ForegroundColor Green "IoT Edge VM Credentials:"
+        Write-Host -ForegroundColor Green "IoT Edge VM Details:"
         Write-Host -ForegroundColor Green "Username: $script:vm_username"
         Write-Host -ForegroundColor Green "Password: $script:vm_password"
+        Write-Host -ForegroundColor Green "DNS: $($script:vm_name).$($script:iot_hub_location).cloudapp.azure.com"
+
     }
     else {
         Write-Host
