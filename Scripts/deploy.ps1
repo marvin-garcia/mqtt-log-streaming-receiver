@@ -452,7 +452,7 @@ function New-ELMSEnvironment() {
 
     #region deployment option
     $deployment_options = @(
-        "Create a sandbox environment for testing",
+        "Create a sandbox environment",
         "Custom deployment"
     )
 
@@ -743,11 +743,10 @@ function New-ELMSEnvironment() {
         # Create main deployment
         Write-Host "`r`nCreating main IoT edge device deployment"
 
-        az iot edge deployment create `
-            -d "main-deployment" `
+        az iot edge set-modules `
+            --device-id $script:vm_name `
             --hub-name $script:iot_hub_name `
-            --content "$($root_path)/EdgeSolution/deployment.manifest.json" `
-            --target-condition=$script:deployment_condition | Out-Null
+            --content "$($root_path)/EdgeSolution/deployment-1.1.manifest.json" | Out-Null
 
         $priority = 0
 
@@ -862,9 +861,6 @@ function New-ELMSEnvironment() {
     #     }
     # } while ($response.StatusCode -ne 200 -and $attemps -gt 0)
     #endregion
-
-    # alerts
-    # Set-ELMSAlerts -new_deployment $true
 
     #region completion message
     Write-Host
