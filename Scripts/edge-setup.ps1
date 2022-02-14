@@ -27,22 +27,9 @@ $path = Split-Path $script:MyInvocation.MyCommand.Path
 $enrollPath = join-path $path dps-enroll.ps1
 if ($PsVersionTable.Platform -eq "Unix") {
 
+    $template = "/etc/aziot/config.toml.edge.template"
     $file = "/etc/aziot/config.toml"
-    if (Test-Path $file) {
-        $backup = "$($file)-backup"
-        if (Test-Path $backup) {
-            Write-Host "Already configured."
-            return
-        }
-        $configToml = Get-Content $file -Raw
-        if ([string]::IsNullOrWhiteSpace($configToml)) {
-            throw "$($file) empty."
-        }
-        $configToml | Out-File $backup -Force
-    }
-    else {
-        throw "$($file) does not exist."
-    }
+    Copy-Item $template $file -Force
 
     Write-Host "Create new IoT Edge enrollment."
     $enrollment = & $enrollPath -dpsConnString $dpsConnString -os Linux
@@ -56,18 +43,18 @@ if ($PsVersionTable.Platform -eq "Unix") {
 
     # add dps setting
     $configToml += "`n"
-    $configToml += "`n########################################################################"
+    $configToml += "`n##########################################################################"
     $configToml += "`n# DPS symmetric key provisioning configuration - added by edge-setup.ps1 #"
-    $configToml += "`n########################################################################"
+    $configToml += "`n##########################################################################"
     $configToml += "`n"
     $configToml += "`n[provisioning]"
     $configToml += "`nsource = `"dps`""
     $configToml += "`nglobal_endpoint = `"$dpsGlobalEndpoint`""
-    $configToml += "`nscope_id = `"$($idScope)`""
-    $configToml += "`n[provisioning.attestation]"
+    $configToml += "`nid_scope = `"$($idScope)`""
+    $configToml += "`n`n[provisioning.attestation]"
     $configToml += "`nmethod = `"symmetric_key`""
     $configToml += "`nregistration_id = `"$($enrollment.registrationId)`""
-    $configToml += "`nsymmetric_key = `"$($enrollment.primaryKey)`""
+    $configToml += "`nsymmetric_key = { value = `"$($enrollment.primaryKey)`" }"
     $configToml += "`n"
     $configToml += "`n########################################################################"
     $configToml += "`n"
