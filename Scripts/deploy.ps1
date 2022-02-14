@@ -431,9 +431,9 @@ function New-ELMSEnvironment() {
     Write-Host "#########################################"
     Write-Host "#########################################"
 
-    Start-Sleep -Milliseconds 1500
+    # Start-Sleep -Milliseconds 1500
 
-    Write-Host
+    # Write-Host
     # Write-Host "Welcome to IoT ELMS (Edge Logging & Monitoring Solution). This deployment script will help you deploy IoT ELMS in your Azure subscription. It can be deployed as a sandbox environment, with a new IoT hub and a test IoT Edge device generating sample logs and collecting monitoring metrics, or it can connect to your existing IoT Hub and Log analytics workspace."
     # Write-Host
     # Write-Host "Press Enter to continue."
@@ -481,7 +481,7 @@ function New-ELMSEnvironment() {
         $script:sandbox = $true
 
         Set-IoTHub
-        # Set-Storage
+        Set-Storage
         Set-LogAnalyticsWorkspace
     }
 
@@ -527,7 +527,7 @@ function New-ELMSEnvironment() {
         #endregion
 
         #region storage account
-        # Set-Storage
+        Set-Storage
 
         if (!$script:create_event_grid) {
             Write-Host
@@ -540,7 +540,7 @@ function New-ELMSEnvironment() {
         #endregion
     }
     
-    # #region metrics monitoring
+    #region metrics monitoring
     # if ($script:sandbox) {
     #     $script:enable_monitoring = $true
     #     $script:monitoring_mode = "IoTMessage"
@@ -556,7 +556,7 @@ function New-ELMSEnvironment() {
     #     }
     # }
 
-    #region select monitoring type
+    # region select monitoring type
     # if ($script:enable_monitoring -and $null -eq $script:monitoring_mode) {
 
     #     $option = Get-InputSelection `
@@ -578,15 +578,17 @@ function New-ELMSEnvironment() {
     #         $script:create_event_hubs = $true
     #     }
     # }
+
+    $script:enable_monitoring = $false
     #endregion
 
-    # if ($script:enable_monitoring) {
-    #     Set-EventHubsNamespace -route_condition  "id = '$metrics_collector_message_id'"
-    # }
-    # else {
-    #     $script:create_event_hubs_namespace = $false
-    #     $script:create_event_hubs = $false
-    # }
+    if ($script:enable_monitoring) {
+        Set-EventHubsNamespace -route_condition  "id = '$metrics_collector_message_id'"
+    }
+    else {
+        $script:create_event_hubs_namespace = $false
+        $script:create_event_hubs = $false
+    }
     #endregion
 
     #region obtain deployment location
@@ -642,7 +644,6 @@ function New-ELMSEnvironment() {
         "iotHubName"                  = @{ "value" = $script:iot_hub_name }
         "iotHubResourceGroup"         = @{ "value" = $script:iot_hub_resource_group }
         "iotHubServicePolicyName"     = @{ "value" = $script:iot_hub_policy_name }
-        # "deviceQuery"                 = @{ "value" = $script:device_query }
         "createStorageAccount"        = @{ "value" = $script:create_storage }
         "storageAccountLocation"      = @{ "value" = $script:storage_account_location }
         "storageAccountName"          = @{ "value" = $script:storage_account_name }
@@ -655,12 +656,7 @@ function New-ELMSEnvironment() {
         "workspaceLocation"           = @{ "value" = $script:workspace_location }
         "workspaceName"               = @{ "value" = $script:workspace_name }
         "workspaceResourceGroup"      = @{ "value" = $script:workspace_resource_group }
-        # "functionAppName"             = @{ "value" = $script:function_app_name }
-        # "httpTriggerFunction"         = @{ "value" = $script:invoke_log_upload_function_name }
-        # "logsRegex"                   = @{ "value" = $script:logs_regex }
-        # "logsSince"                   = @{ "value" = $script:logs_since }
-        # "logsEncoding"                = @{ "value" = $script:logs_encoding }
-        # "metricsEncoding"             = @{ "value" = $script:metrics_encoding }
+        "functionAppName"             = @{ "value" = $script:function_app_name }
         "templateUrl"                 = @{ "value" = $github_repo_url }
         "branchName"                  = @{ "value" = $(git rev-parse --abbrev-ref HEAD) }
     }

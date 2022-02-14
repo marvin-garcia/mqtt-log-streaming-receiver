@@ -239,13 +239,6 @@
           "description": "Event grid system topic name for the logs storage account."
         }
       },
-      "deviceQuery": {
-        "type": "string",
-        "defaultValue": "SELECT * FROM devices",
-        "metadata": {
-          "description": "IoT hub device query to target specific IoT edge devices."
-        }
-      },
       "createWorkspace": {
         "type": "bool",
         "defaultValue": true,
@@ -424,63 +417,6 @@
         "defaultValue": "test",
         "metadata": {
           "description": "Name for the Function App resource."
-        }
-      },
-      "httpTriggerFunction": {
-        "type": "string",
-        "defaultValue": "InvokeUploadModuleLogs",
-        "metadata": {
-          "description": "Name of the Http trigger function to schedule module logs upload."
-        }
-      },
-      "moduleIdRegex": {
-        "type": "string",
-        "defaultValue": ".*",
-        "metadata": {
-          "description": "Regular expression that supplies the IoT edge module name. It can match multiple modules. .NET Regular Expressions format is expected."
-        }
-      },
-      "logsRegex": {
-        "type": "string",
-        "defaultValue": "\\b(WRN?|ERR?|CRIT?)\\b",
-        "metadata": {
-          "description": "Regular expression used to filter log lines with content that matches the specified regular expression. .NET Regular Expressions format is expected."
-        }
-      },
-      "logsType": {
-        "type": "string",
-        "defaultValue": "iotedgemodulelogs",
-        "metadata": {
-          "description": "A name to group logs by in Log analytics."
-        }
-      },
-      "logsSince": {
-        "type": "string",
-        "defaultValue": "1h",
-        "metadata": {
-          "description": "Only retrieve logs since this time, as a duration (1d, 90m, 2 days 3 hours 2 minutes), rfc3339 timestamp, or UNIX timestamp."
-        }
-      },
-      "logsEncoding": {
-        "type": "string",
-        "defaultValue": "gzip",
-        "allowedValues": [
-          "none",
-          "gzip"
-        ],
-        "metadata": {
-          "description": "Logs encoding format."
-        }
-      },
-      "metricsEncoding": {
-        "type": "string",
-        "defaultValue": "gzip",
-        "allowedValues": [
-          "none",
-          "gzip"
-        ],
-        "metadata": {
-          "description": "Metrics encoding format."
         }
       },
       "templateUrl": {
@@ -985,10 +921,6 @@
                 "value": "[parameters('storageContainerName')]"
               },
               {
-                "name": "DeviceQuery",
-                "value": "[parameters('deviceQuery')]"
-              },
-              {
                 "name": "HubHostName",
                 "value": "[reference(variables('iotHubDeploymentName'), variables('linkedDeploymentApiVersion')).outputs.hostname.value]"                
               },
@@ -1017,34 +949,6 @@
                 "value": "json"
               },
               {
-                "name": "LogsEncoding",
-                "value": "[parameters('logsEncoding')]"
-              },
-              {
-                "name": "MetricsEncoding",
-                "value": "[parameters('metricsEncoding')]"
-              },
-              {
-                "name": "LogsMaxSizeMB",
-                "value": "28"
-              },
-              {
-                "name": "LogsIdRegex",
-                "value": "[parameters('moduleIdRegex')]"
-              },
-              {
-                "name": "LogsRegex",
-                "value": "[parameters('logsRegex')]"
-              },
-              {
-                "name": "LogsSince",
-                "value": "[parameters('logsSince')]"
-              },
-              {
-                "name": "LogType",
-                "value": "[parameters('logsType')]"
-              },
-              {
                 "name": "WorkspaceApiVersion",
                 "value": "2016-04-01"
               },
@@ -1059,10 +963,6 @@
               {
                 "name": "WorkspaceDomainSuffix",
                 "value": "[variables('workspaceDomainSuffix')]"
-              },
-              {
-                "name": "HttpTriggerFunction",
-                "value": "[parameters('httpTriggerFunction')]"
               },
               {
                 "name": "WEBSITE_LOAD_USER_PROFILE",
