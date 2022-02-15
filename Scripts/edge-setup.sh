@@ -2,14 +2,17 @@
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --dpsConnString)                  dpsConnString="$2" ;;
-        --idScope)                        idScope="$2" ;;
-        --dpsGlobalEndpoint)              dpsGlobalEndpoint="$2" ;;
+        --iotHubHostname)                  iotHubHostname="$2" ;;
+        --deviceId)                        deviceId="$2" ;;
+        --certName)                        certName="$2" ;;
+        --keyName)                         keyName="$2" ;;
+        --caName)                          caName="$2" ;;
     esac
     shift
 done
 
 curdir="$( cd "$(dirname "$0")" ; pwd -P )"
+certdir="/usr/local/share/ca-certificates"
 
 echo "In $curdir..."
 echo "Prepare machine..."
@@ -24,13 +27,21 @@ apt-get update
 apt-get install -y --no-install-recommends powershell
 echo "Powershell installed."
 
+apt-get install -y ca-certificates
 apt-get install -y moby-engine
 apt-get install -y aziot-edge
 echo "iotedge installed."
 
+echo "Installing CA root certificate..."
+cp $caName $certdir
+cp $certName $certdir
+cp $keyName $certdir
+update-ca-certificates
+echo "certificates installed."
+
 echo "Provisioning iotedge..."
 sleep 3
-pwsh -File $curdir/edge-setup.ps1 -dpsConnString $dpsConnString -idScope $idScope -dpsGlobalEndpoint $dpsGlobalEndpoint
+pwsh -File $curdir/edge-setup.ps1 -iotHubHostname $iotHubHostname -deviceId $deviceId -certName "$certdir/$certName" -keyName "$certdir/$keyName"
 echo "iotedge provisioned."
 
 echo "Restarting iotedge runtime..."
