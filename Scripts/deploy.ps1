@@ -97,10 +97,10 @@ function Set-ResourceGroupName {
 function Get-LeafDeviceName {
     param()
 
-    $device_name = $null
+    $device_id = $null
     $first = $true
 
-    while ([string]::IsNullOrEmpty($device_name) -or ($device_cert_option -notmatch "^[a-z0-9-]*$")) {
+    while ([string]::IsNullOrEmpty($device_id) -or ($leaf_device_option -notmatch "^[a-z0-9-]*$")) {
         if ($first -eq $false) {
             Write-Host "Use alphanumeric characters as well as '-'."
         }
@@ -109,9 +109,9 @@ function Get-LeafDeviceName {
             Write-Host "Provide a name for the leaf IoT device."
             $first = $false
         }
-        $device_name = Read-Host -Prompt ">"
+        $device_id = Read-Host -Prompt ">"
 
-        return $device_name
+        return $device_id
     }
 }
 
@@ -736,53 +736,6 @@ function New-ELMSEnvironment() {
     New-CACertsEdgeDevice "ca-cert"
     #endregion
 
-    #region Leaf device certificates
-    $script:device_certs = @()
-    do {
-        $device_cert_options = @(
-            "Yes",
-            "No"
-        )
-
-        $device_cert_option = Get-InputSelection `
-            -options $device_cert_options `
-            -text "Do you want to create certificates for your leaf devices?"
-        
-        if ($device_cert_option -eq 1) {
-
-            $device_name = Get-LeafDeviceName
-
-            New-CACertsDevice "$device_name-primary"
-            New-CACertsDevice "$device_name-secondary"
-
-            $script:device_certs += @{
-                "device_name" = $device_name
-                "primary_cert" = @{
-                    "name" = "iot-device-$device_name-primary.cert.pem"
-                    "path" = "$root_path/Scripts/certs/iot-device-$device_name-primary.cert.pem"
-                    "url" = ""
-                }
-                "primary_pk" = @{
-                    "name" = "iot-device-$device_name-primary.key.pem"
-                    "path" = "$root_path/Scripts/private/iot-device-$device_name-primary.key.pem"
-                    "url" = ""
-                }
-                "secondary_cert" = @{
-                    "name" = "iot-device-$device_name-secondary.cert.pem"
-                    "path" = "$root_path/Scripts/certs/iot-device-$device_name-secondary.cert.pem"
-                    "url" = ""
-                }
-                "secondary_pk" = @{
-                    "name" = "iot-device-$device_name-secondary.key.pem"
-                    "path" = "$root_path/Scripts/private/iot-device-$device_name-secondary.key.pem"
-                    "url" = ""
-                }
-            }
-        }
-    }
-    while ($device_cert_option -eq 1)
-    #endregion
-
     #region register edge device
     $iotedge_container = "iotedgecerts"
     $root_cert_name = "azure-iot-test-only.root.ca.cert.pem"
@@ -830,7 +783,6 @@ function New-ELMSEnvironment() {
         --expiry (Get-Date -AsUTC).AddHours(1).ToString('yyyy-MM-ddTHH:mm:00Z') `
         --full-uri `
         -o tsv
-    $iotedge_cert_sas = [System.Web.HttpUtility]::UrlDecode($iotedge_cert_sas)
     
     Write-Host "Uploading edge root certificate."
     az storage blob upload `
@@ -849,8 +801,7 @@ function New-ELMSEnvironment() {
         --expiry (Get-Date -AsUtc).AddHours(1).ToString('yyyy-MM-ddTHH:mm:00Z') `
         --full-uri `
         -o tsv
-    $root_cert_sas = [System.Web.HttpUtility]::UrlDecode($root_cert_sas)
-
+    
     Write-Host "Uploading iot edge private key."
     az storage blob upload `
         --account-name $script:storage_account_name `
@@ -868,67 +819,6 @@ function New-ELMSEnvironment() {
         --expiry (Get-Date -AsUtc).AddHours(1).ToString('yyyy-MM-ddTHH:mm:00Z') `
         --full-uri `
         -o tsv
-    $iotedge_key_sas = [System.Web.HttpUtility]::UrlDecode($iotedge_key_sas)
-
-    if ($script:device_certs.Count -gt 0) {
-        
-        Write-Host "Creating leaf devices."
-        foreach ($device in $script:device_certs) {
-
-            Write-Host "Creating leaf device $($device.device_name)."
-            az iot hub device-identity create `
-                --device-id $($device.device_name) `
-                --hub-name $script:iot_hub_name `
-                --auth-method x509_thumbprint `
-                --primary-thumbprint $(openssl x509 -noout -fingerprint -inform pem -sha1 -in $device.primary_cert.path).Split('=')[1].Replace(':','').Trim() `
-                --secondary-thumbprint $(openssl x509 -noout -fingerprint -inform pem -sha1 -in $device.secondary_cert.path).Split('=')[1].Replace(':','').Trim()
-
-            az iot hub device-identity parent set `
-                --device-id $device.device_name `
-                --parent-device-id $script:vm_name `
-                --hub-name $script:iot_hub_name
-
-            Write-Host "Uploading primary certificate for leaf device $($device.device_name)."
-            az storage blob upload `
-                --account-name $script:storage_account_name `
-                --account-key $storage_key `
-                --container-name $iotedge_container `
-                --file $device.primary_cert.path `
-                --name $device.primary_cert.name
-
-            $sas = az storage blob generate-sas `
-                --account-name $script:storage_account_name `
-                --account-key $storage_key `
-                --container-name $iotedge_container `
-                --name $device.primary_cert.name `
-                --permissions r `
-                --expiry (Get-Date -AsUtc).AddDays(10).ToString('yyyy-MM-ddTHH:mm:00Z') `
-                --full-uri `
-                -o tsv
-
-            $device.primary_cert.url = [System.Web.HttpUtility]::UrlDecode($sas)
-
-            Write-Host "Uploading primary key for leaf device $($device.device_name)."
-            az storage blob upload `
-                --account-name $script:storage_account_name `
-                --account-key $storage_key `
-                --container-name $iotedge_container `
-                --file $device.primary_pk.path `
-                --name $device.primary_pk.name
-
-            $sas = az storage blob generate-sas `
-                --account-name $script:storage_account_name `
-                --account-key $storage_key `
-                --container-name $iotedge_container `
-                --name $device.primary_pk.name `
-                --permissions r `
-                --expiry (Get-Date -AsUtc).AddDays(10).ToString('yyyy-MM-ddTHH:mm:00Z') `
-                --full-uri `
-                -o tsv
-
-            $device.primary_pk.url = [System.Web.HttpUtility]::UrlDecode($sas)
-        }
-    }
 
     Write-Host "Registering iot edge device."
     $protected_settings_path = "$root_path/Scripts/vm-script.json"
@@ -950,7 +840,45 @@ function New-ELMSEnvironment() {
         --name customScript `
         --publisher Microsoft.Azure.Extensions `
         --protected-settings $protected_settings_path
+    #endregion
 
+    #region Leaf devices
+    $script:leaf_devices = @()
+    do {
+        $leaf_device_options = @(
+            "Yes",
+            "No"
+        )
+
+        $leaf_device_option = Get-InputSelection `
+            -options $leaf_device_options `
+            -text "Do you want to create any leaf devices?"
+        
+        if ($leaf_device_option -eq 1) {
+
+            $device_id = Get-LeafDeviceName
+            az iot hub device-identity create `
+                --device-id $device_id `
+                --hub-name $script:iot_hub_name `
+                --auth-method shared_private_key | Out-Null
+
+            az iot hub device-identity parent set `
+                --device-id $device.device_name `
+                --parent-device-id $script:vm_name `
+                --hub-name $script:iot_hub_name | Out-Null
+            
+            $device_conn_str = az iot hub device-identity connection-string show `
+                --device-id $device.device_name `
+                --hub-name $script:iot_hub_name `
+                --key-type primary `
+                -o tsv
+            $script:leaf_devices += @{
+                "device_id" = $device_id
+                "connection_string" = $device_conn_str
+            }
+        }
+    }
+    while ($leaf_device_option -eq 1)
     #endregion
 
     #region update azure function host key app setting
@@ -1044,11 +972,20 @@ function New-ELMSEnvironment() {
         Write-Host -ForegroundColor Green "Username: $script:vm_username"
         Write-Host -ForegroundColor Green "Password: $script:vm_password"
         Write-Host -ForegroundColor Green "DNS: $($script:vm_name).$($script:iot_hub_location).cloudapp.azure.com"
-
+        Write-Host -ForegroundColor Green "Edge root CA certificate URL: $root_cert_sas"
     }
     else {
         Write-Host
         Write-Host -ForegroundColor Green "REMINDER: Update device twin for your IoT edge devices with `"$($script:deployment_condition)`" to apply the edge configuration."
+    }
+
+    if ($script:leaf_devices.Count -gt 0) {
+        Write-Host
+        Write-Host -ForegroundColor Green "IoT Leaf Devices Details:"
+        foreach ($device in $script:leaf_devices) {
+            Write-Host
+            Write-Host -ForegroundColor Green "$($device.device_id): $($device.connection_string)"
+        }
     }
 
     Write-Host

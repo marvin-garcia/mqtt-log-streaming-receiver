@@ -217,6 +217,62 @@
               "priority": 100,
               "direction": "Inbound"
             }
+          },
+          {
+            "name": "AMQP",
+            "properties": {
+              "description": "Locks inbound down to AMQP default port 5671.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5671",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "MQTT",
+            "properties": {
+              "description": "Locks inbound down to MQTT default port 8883.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8883",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 120,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "HTTPS",
+            "properties": {
+              "description": "Locks inbound down to HTTP default port 443.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 130,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "SMQTT",
+            "properties": {
+              "description": "Locks inbound down to Secure MQTT default port 1883.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "1883",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 140,
+              "direction": "Inbound"
+            }
           }
         ]
       }

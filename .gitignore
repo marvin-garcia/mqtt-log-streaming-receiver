@@ -11,3 +11,17 @@ Cargo.lock
 
 # Template parameters
 Templates/*.parameters.json
+Scripts/csr
+Scripts/certs
+Scripts/intermediateCerts
+Scripts/newcerts
+Scripts/private
+Scripts/.rnd
+Scripts/algorithmUsed.txt
+Scripts/index.txt
+Scripts/index.txt.attr
+Scripts/index.txt.old
+Scripts/index.txt.attr.old
+Scripts/serial
+Scripts/serial.old
+Scripts/vm-script.json

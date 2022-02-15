@@ -33,15 +33,16 @@ apt-get install -y aziot-edge
 echo "iotedge installed."
 
 echo "Installing CA root certificate..."
-cp $caName $certdir
-cp $certName $certdir
-cp $keyName $certdir
+cp $caName "$certdir/$caName.crt"
+cp $certName "$certdir/$certName.crt"
+cp $keyName "$certdir/$keyName.crt"
 update-ca-certificates
+chmod 644 $certdir/*pem
 echo "certificates installed."
 
 echo "Provisioning iotedge..."
 sleep 3
-pwsh -File $curdir/edge-setup.ps1 -iotHubHostname $iotHubHostname -deviceId $deviceId -certName "$certdir/$certName" -keyName "$certdir/$keyName"
+pwsh -File $curdir/edge-setup.ps1 -iotHubHostname $iotHubHostname -deviceId $deviceId -certFile "$certdir/$certName.crt" -keyFile "$certdir/$keyName.crt"
 echo "iotedge provisioned."
 
 echo "Restarting iotedge runtime..."
