@@ -148,32 +148,6 @@
           "description": "Specifies the username password for the Virtual Machine."
         }
       },
-      "dpsSku": {
-        "type": "string",
-        "defaultValue": "S1",
-        "allowedValues": [
-          "S1"
-        ],
-        "metadata": {
-          "description": "The Azure Device Provisioning service SKU to use."
-        }
-      },
-      "dpsCapacity": {
-        "type": "int",
-        "defaultValue": 1,
-        "minValue": 1,
-        "maxValue": 3,
-        "metadata": {
-          "description": "The Azure Device Provisioning service capacity."
-        }
-      },
-      "dpsLocation": {
-        "type": "string",
-        "defaultValue": "[resourceGroup().location]",
-        "metadata": {
-          "description": "Location of Azure IoT Hub for Device Provisioning service."
-        }
-      },
       "createStorageAccount": {
         "type": "bool",
         "defaultValue": true,
@@ -434,7 +408,6 @@
       }
     },
   "variables": {
-    "dpsName": "[concat('dps-', parameters('environmentHashId'))]",
     "iotHubOwnerPolicyName": "iothubowner",
     "edgeVmDnsName": "[concat(parameters('edgeVmName'), '-', parameters('environmentHashId'))]",
     "eventGridSubscriptionName": "[concat('iotedgemodulelogs', parameters('environmentHashId'))]",
@@ -588,18 +561,6 @@
             "eventHubsRouteCondition": {
               "value": "[parameters('eventHubsRouteCondition')]"
             },
-            "dpsName": {
-              "value": "[variables('dpsName')]"
-            },
-            "dpsSku": {
-              "value": "[parameters('dpsSku')]"
-            },
-            "dpsCapacity": {
-              "value": "[parameters('dpsCapacity')]"
-            },
-            "dpsLocation": {
-              "value": "[parameters('dpsLocation')]"
-            },
             "edgeVmName": {
               "value": "[parameters('edgeVmName')]"
             },
@@ -678,18 +639,6 @@
             },
             "iotHubServicePolicyName": {
               "value": "[parameters('iotHubServicePolicyName')]"
-            },
-            "dpsName": {
-              "value": "[variables('dpsName')]"
-            },
-            "dpsSku": {
-              "value": "[parameters('dpsSku')]"
-            },
-            "dpsCapacity": {
-              "value": "[parameters('dpsCapacity')]"
-            },
-            "dpsLocation": {
-              "value": "[parameters('dpsLocation')]"
             },
             "edgeVmName": {
               "value": "[parameters('edgeVmName')]"

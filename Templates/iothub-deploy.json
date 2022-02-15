@@ -32,18 +32,6 @@
     "iotHubServicePolicyName": {
       "type": "string"
     },
-    "dpsName": {
-      "type": "string"
-    },
-    "dpsSku": {
-      "type": "string"
-    },
-    "dpsCapacity": {
-      "type": "int"
-    },
-    "dpsLocation": {
-      "type": "string"
-    },
     "edgeVmName": {
       "type": "string",
       "defaultValue": ""
@@ -94,14 +82,6 @@
     "iotHubOwnerKeysId": "[resourceId(resourceGroup().name, 'Microsoft.Devices/Iothubs/IoTHubKeys', parameters('iotHubName'), parameters('iotHubOwnerPolicyName'))]",
     "iotHubServiceKeysId": "[resourceId(resourceGroup().name, 'Microsoft.Devices/Iothubs/IoTHubKeys', parameters('iotHubName'), parameters('iotHubServicePolicyName'))]",
     "iotHubApiVersion": "[providers('Microsoft.Devices', 'IoTHubs').apiVersions[0]]",
-    "dpsResourceId": "[resourceId(resourceGroup().name, 'Microsoft.Devices/provisioningServices', parameters('dpsName'))]",
-    // az provider show --namespace Microsoft.Devices --query "resourceTypes[?resourceType=='ProvisioningServices'].apiVersions | [0]" --out table
-    // returns 2021-10-15, which is not supported
-    // providers funcion is deprecated (https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/template-functions-resource#providers) and
-    // it is recommended to use explicit API version   
-    "dpsApiVersion": "2020-03-01",
-    "dpsGlobalDomain": "[if(startsWith(parameters('iotHubLocation'), 'usgov'), 'azure-devices-provisioning.us', if(startsWith(parameters('iotHubLocation'), 'usdod'), 'azure-devices-provisioning.us', 'azure-devices-provisioning.net'))]",
-    "dpsGlobalEndpoint": "[concat('global.', variables('dpsGlobalDomain'))]",
     "edgePublicIPAddressName": "[concat(parameters('edgeVmName'), '-ip')]",
     "edgeNetworkInterfaceName": "[concat(parameters('edgeVmName'), '-nic')]",
     "edgeNetworkSecurityGroupName": "[concat(parameters('edgeVmName'), '-nsg')]"
@@ -184,30 +164,6 @@
           }
         },
         "features": "None"
-      }
-    },
-    {
-      "comments": "Azure Device Provisioning service.",
-      "condition": "[parameters('createIoTHub')]",
-      "type": "Microsoft.Devices/provisioningServices",
-      "name": "[parameters('dpsName')]",
-      "apiVersion": "2018-01-22",
-      "location": "[parameters('dpsLocation')]",
-      "sku": {
-        "name": "[parameters('dpsSku')]",
-        "capacity": "[parameters('dpsCapacity')]"
-      },
-      "dependsOn": [
-        "[variables('iotHubId')]"
-      ],
-      "properties": {
-        "iotHubs": [
-          {
-            "connectionString": "[concat('HostName=', reference(variables('iotHubId'), variables('iotHubApiVersion')).hostName, ';SharedAccessKeyName=', parameters('iotHubOwnerPolicyName'), ';SharedAccessKey=', listKeys(variables('iotHubOwnerKeysId'), variables('iotHubApiVersion')).primaryKey)]",
-            "location": "[parameters('dpsLocation')]",
-            "name": "[concat(parameters('iotHubName'), variables('iotHubDomain'))]"
-          }
-        ]
       }
     },
     {
@@ -352,33 +308,6 @@
           ]
         }
       }
-    },
-    {
-      "comments": "One time script to configure and onboard the IoT edge virtual machine",
-      "condition": "[parameters('createIoTHub')]",
-      "type": "Microsoft.Compute/virtualMachines/extensions",
-      "name": "[concat(parameters('edgeVmName'), '/', 'scriptextensions')]",
-      "apiVersion": "2019-03-01",
-      "location": "[parameters('iotHubLocation')]",
-      "properties": {
-        "publisher": "Microsoft.Azure.Extensions",
-        "type": "CustomScript",
-        "typeHandlerVersion": "2.0",
-        "autoUpgradeMinorVersion": true,
-        "settings": {
-          "fileUris": [
-            "[concat(parameters('templateUrl'), '/', parameters('branchName'), '/Scripts/dps-enroll.ps1')]",
-            "[concat(parameters('templateUrl'), '/', parameters('branchName'), '/Scripts/edge-setup.ps1')]",
-            "[concat(parameters('templateUrl'), '/', parameters('branchName'), '/Scripts/edge-setup.sh')]"
-          ]
-        },
-        "protectedSettings": {
-          "commandToExecute": "[concat('sudo bash edge-setup.sh --idScope \"', if(parameters('createIoTHub'), reference(variables('dpsResourceId'), variables('dpsApiVersion')).idScope, 'idScope'), '\" --dpsConnString \"', 'HostName=', parameters('dpsName'), '.', variables('dpsGlobalDomain'), ';SharedAccessKeyName=provisioningserviceowner;SharedAccessKey=', if(parameters('createIoTHub'), listKeys(variables('dpsResourceId'), variables('dpsApiVersion')).value[0].primaryKey, 'SharedAccessKey'), '\"', ' --dpsGlobalEndpoint ', '\"', 'https://', variables('dpsGlobalEndpoint'), '\"')]"
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', parameters('edgeVmName'))]"
-      ]
     }
   ],
   "outputs": {
