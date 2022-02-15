@@ -1,6 +1,7 @@
 $root_path = Split-Path $PSScriptRoot -Parent
 Import-Module "$root_path/Scripts/PS-Library"
 $github_repo_url = "https://raw.githubusercontent.com/marvin-garcia/mqtt-log-streaming-receiver"
+$github_branch_name = $(git rev-parse --abbrev-ref HEAD)
 
 function Set-EnvironmentHash {
     param(
@@ -90,6 +91,27 @@ function Set-ResourceGroupName {
         else {
             $script:create_resource_group = $false
         }
+    }
+}
+
+function Get-LeafDeviceName {
+    param()
+
+    $device_name = $null
+    $first = $true
+
+    while ([string]::IsNullOrEmpty($device_name) -or ($device_cert_option -notmatch "^[a-z0-9-]*$")) {
+        if ($first -eq $false) {
+            Write-Host "Use alphanumeric characters as well as '-'."
+        }
+        else {
+            Write-Host
+            Write-Host "Provide a name for the leaf IoT device."
+            $first = $false
+        }
+        $device_name = Read-Host -Prompt ">"
+
+        return $device_name
     }
 }
 
@@ -388,6 +410,8 @@ function Set-EdgeInfrastructure {
         if ($vm_sizes.Count -ne 0) {
             $script:vm_size = $vm_sizes[0].Name
         }
+
+        # $script:vm_size = "Standard_B2ms"
         #endregion
 
         #region virtual network parameters
@@ -621,13 +645,13 @@ function New-ELMSEnvironment() {
     #endregion
 
     #region set resource location
-    if (!$script:storage_account_location) {
+    if (!(Get-Variable -Name storage_account_location -ErrorAction SilentlyContinue)) {
         $script:storage_account_location = $script:iot_hub_location
     }
-    if (!$script:workspace_location) {
+    if (!(Get-Variable -Name workspace_location -ErrorAction SilentlyContinue)) {
         $script:workspace_location = $script:iot_hub_location
     }
-    if (!$script:event_hubs_location) {
+    if (!(Get-Variable -Name event_hubs_location -ErrorAction SilentlyContinue)) {
         $script:event_hubs_location = $script:iot_hub_location
     }
     #endregion
@@ -658,7 +682,7 @@ function New-ELMSEnvironment() {
         "workspaceResourceGroup"      = @{ "value" = $script:workspace_resource_group }
         "functionAppName"             = @{ "value" = $script:function_app_name }
         "templateUrl"                 = @{ "value" = $github_repo_url }
-        "branchName"                  = @{ "value" = $(git rev-parse --abbrev-ref HEAD) }
+        "branchName"                  = @{ "value" = $github_branch_name }
     }
 
     if ($script:create_iot_hub) {
@@ -697,10 +721,236 @@ function New-ELMSEnvironment() {
         --mode Incremental `
         --template-file "$($root_path)/Templates/azuredeploy.json" `
         --parameters "$($root_path)/Templates/azuredeploy.parameters.json" | ConvertFrom-Json
-    
+
     if (!$script:deployment_output) {
         throw "Something went wrong with the resource group deployment. Ending script."        
     }
+    #endregion
+
+    #region generate edge certificates
+    Import-Module "$root_path/Scripts/ca-certs.ps1"
+    Set-Location "$root_path/Scripts/"
+
+    New-CACertsCertChain rsa
+    New-CACertsEdgeDeviceIdentity "$script:vm_name"
+    New-CACertsEdgeDevice "ca-cert"
+    #endregion
+
+    #region Leaf device certificates
+    $script:device_certs = @()
+    do {
+        $device_cert_options = @(
+            "Yes",
+            "No"
+        )
+
+        $device_cert_option = Get-InputSelection `
+            -options $device_cert_options `
+            -text "Do you want to create certificates for your leaf devices?"
+        
+        if ($device_cert_option -eq 1) {
+
+            $device_name = Get-LeafDeviceName
+
+            New-CACertsDevice "$device_name-primary"
+            New-CACertsDevice "$device_name-secondary"
+
+            $script:device_certs += @{
+                "device_name" = $device_name
+                "primary_cert" = @{
+                    "name" = "iot-device-$device_name-primary.cert.pem"
+                    "path" = "$root_path/Scripts/certs/iot-device-$device_name-primary.cert.pem"
+                    "url" = ""
+                }
+                "primary_pk" = @{
+                    "name" = "iot-device-$device_name-primary.key.pem"
+                    "path" = "$root_path/Scripts/private/iot-device-$device_name-primary.key.pem"
+                    "url" = ""
+                }
+                "secondary_cert" = @{
+                    "name" = "iot-device-$device_name-secondary.cert.pem"
+                    "path" = "$root_path/Scripts/certs/iot-device-$device_name-secondary.cert.pem"
+                    "url" = ""
+                }
+                "secondary_pk" = @{
+                    "name" = "iot-device-$device_name-secondary.key.pem"
+                    "path" = "$root_path/Scripts/private/iot-device-$device_name-secondary.key.pem"
+                    "url" = ""
+                }
+            }
+        }
+    }
+    while ($device_cert_option -eq 1)
+    #endregion
+
+    #region register edge device
+    $iotedge_container = "iotedgecerts"
+    $root_cert_name = "azure-iot-test-only.root.ca.cert.pem"
+    $root_cert_path = "$($root_path)/Scripts/certs/$($root_cert_name)"
+    $iotedge_cert_name = "iot-edge-device-identity-$($script:vm_name).cert.pem"
+    $iotedge_cert_path = "$($root_path)/Scripts/certs/$iotedge_cert_name"
+    $iotedge_key_name = "iot-edge-device-identity-$($script:vm_name).key.pem"
+    $iotedge_key_path = "$($root_path)/Scripts/private/$iotedge_key_name"
+    $thumbprint = $(openssl x509 -noout -fingerprint -inform pem -sha1 -in $iotedge_cert_path).Split('=')[1].Replace(':','').Trim()
+
+    Write-Host "Creating edge device."
+    az iot hub device-identity create `
+        --device-id $script:vm_name `
+        --hub-name $script:iot_hub_name `
+        --edge-enabled `
+        --auth-method x509_thumbprint `
+        --primary-thumbprint $thumbprint `
+        --secondary-thumbprint $thumbprint
+
+    $storage_key = az storage account keys list `
+        --account-name $script:storage_account_name `
+        --resource-group $script:storage_account_resource_group `
+        --query '[0].value' -o tsv
+    
+    az storage container create `
+        --account-name $script:storage_account_name `
+        --account-key $storage_key `
+        --resource-group $script:storage_account_resource_group `
+        --name $iotedge_container | Out-Null
+
+    Write-Host "Uploading iot edge certificate."
+    az storage blob upload `
+        --account-name $script:storage_account_name `
+        --account-key $storage_key `
+        --container-name $iotedge_container `
+        --file $iotedge_cert_path `
+        --name $iotedge_cert_name | Out-Null
+
+    $iotedge_cert_sas = az storage blob generate-sas `
+        --account-name $script:storage_account_name `
+        --account-key $storage_key `
+        --container-name $iotedge_container `
+        --name $iotedge_cert_name `
+        --permissions r `
+        --expiry (Get-Date -AsUTC).AddHours(1).ToString('yyyy-MM-ddTHH:mm:00Z') `
+        --full-uri `
+        -o tsv
+    $iotedge_cert_sas = [System.Web.HttpUtility]::UrlDecode($iotedge_cert_sas)
+    
+    Write-Host "Uploading edge root certificate."
+    az storage blob upload `
+        --account-name $script:storage_account_name `
+        --account-key $storage_key `
+        --container-name $iotedge_container `
+        --file $root_cert_path `
+        --name $root_cert_name | Out-Null
+
+    $root_cert_sas = az storage blob generate-sas `
+        --account-name $script:storage_account_name `
+        --account-key $storage_key `
+        --container-name $iotedge_container `
+        --name $root_cert_name `
+        --permissions r `
+        --expiry (Get-Date -AsUtc).AddHours(1).ToString('yyyy-MM-ddTHH:mm:00Z') `
+        --full-uri `
+        -o tsv
+    $root_cert_sas = [System.Web.HttpUtility]::UrlDecode($root_cert_sas)
+
+    Write-Host "Uploading iot edge private key."
+    az storage blob upload `
+        --account-name $script:storage_account_name `
+        --account-key $storage_key `
+        --container-name $iotedge_container `
+        --file $iotedge_key_path `
+        --name $iotedge_key_name | Out-Null
+
+    $iotedge_key_sas = az storage blob generate-sas `
+        --account-name $script:storage_account_name `
+        --account-key $storage_key `
+        --container-name $iotedge_container `
+        --name $iotedge_key_name `
+        --permissions r `
+        --expiry (Get-Date -AsUtc).AddHours(1).ToString('yyyy-MM-ddTHH:mm:00Z') `
+        --full-uri `
+        -o tsv
+    $iotedge_key_sas = [System.Web.HttpUtility]::UrlDecode($iotedge_key_sas)
+
+    if ($script:device_certs.Count -gt 0) {
+        
+        Write-Host "Creating leaf devices."
+        foreach ($device in $script:device_certs) {
+
+            Write-Host "Creating leaf device $($device.device_name)."
+            az iot hub device-identity create `
+                --device-id $($device.device_name) `
+                --hub-name $script:iot_hub_name `
+                --auth-method x509_thumbprint `
+                --primary-thumbprint $(openssl x509 -noout -fingerprint -inform pem -sha1 -in $device.primary_cert.path).Split('=')[1].Replace(':','').Trim() `
+                --secondary-thumbprint $(openssl x509 -noout -fingerprint -inform pem -sha1 -in $device.secondary_cert.path).Split('=')[1].Replace(':','').Trim()
+
+            az iot hub device-identity parent set `
+                --device-id $device.device_name `
+                --parent-device-id $script:vm_name `
+                --hub-name $script:iot_hub_name
+
+            Write-Host "Uploading primary certificate for leaf device $($device.device_name)."
+            az storage blob upload `
+                --account-name $script:storage_account_name `
+                --account-key $storage_key `
+                --container-name $iotedge_container `
+                --file $device.primary_cert.path `
+                --name $device.primary_cert.name
+
+            $sas = az storage blob generate-sas `
+                --account-name $script:storage_account_name `
+                --account-key $storage_key `
+                --container-name $iotedge_container `
+                --name $device.primary_cert.name `
+                --permissions r `
+                --expiry (Get-Date -AsUtc).AddDays(10).ToString('yyyy-MM-ddTHH:mm:00Z') `
+                --full-uri `
+                -o tsv
+
+            $device.primary_cert.url = [System.Web.HttpUtility]::UrlDecode($sas)
+
+            Write-Host "Uploading primary key for leaf device $($device.device_name)."
+            az storage blob upload `
+                --account-name $script:storage_account_name `
+                --account-key $storage_key `
+                --container-name $iotedge_container `
+                --file $device.primary_pk.path `
+                --name $device.primary_pk.name
+
+            $sas = az storage blob generate-sas `
+                --account-name $script:storage_account_name `
+                --account-key $storage_key `
+                --container-name $iotedge_container `
+                --name $device.primary_pk.name `
+                --permissions r `
+                --expiry (Get-Date -AsUtc).AddDays(10).ToString('yyyy-MM-ddTHH:mm:00Z') `
+                --full-uri `
+                -o tsv
+
+            $device.primary_pk.url = [System.Web.HttpUtility]::UrlDecode($sas)
+        }
+    }
+
+    Write-Host "Registering iot edge device."
+    $protected_settings_path = "$root_path/Scripts/vm-script.json"
+    $protected_settings = @{
+        "fileUris" = @(
+            $iotedge_cert_sas,
+            $root_cert_sas,
+            $iotedge_key_sas,
+            "$github_repo_url/$github_branch_name/Scripts/edge-setup.sh",
+            "$github_repo_url/$github_branch_name/Scripts/edge-setup.ps1"
+        )
+        "commandToExecute" = "sudo bash edge-setup.sh --iotHubHostname '$($script:iot_hub_name).azure-devices.net' --deviceId '$script:vm_name' --certName '$iotedge_cert_name' --keyName '$iotedge_key_name' --caName '$root_cert_name'"
+    }
+    Set-Content -Value (ConvertTo-Json $protected_settings | Out-String) -Path $protected_settings_path -Force
+
+    az vm extension set `
+        --resource-group $script:iot_hub_resource_group `
+        --vm-name $script:vm_name `
+        --name customScript `
+        --publisher Microsoft.Azure.Extensions `
+        --protected-settings $protected_settings_path
+
     #endregion
 
     #region update azure function host key app setting
@@ -711,30 +961,6 @@ function New-ELMSEnvironment() {
         --name $script:function_app_name `
         --resource-group $script:resource_group_name `
         --settings "HostUrl=https://$($script:function_app_hostname)" "HostKey=$($script:function_key)" | Out-Null
-    #endregion
-
-    #region generate monitoring deployment manifest
-    # if ($script:enable_monitoring) {
-    #     $script:scrape_frequency = 300
-    #     if ($script:metrics_encoding -eq "gzip") {
-    #         $script:compress_for_upload = "true"
-    #     }
-    #     else {
-    #         $script:compress_for_upload = "false"
-    #     }
-    #     $monitoring_template = "$($root_path)/EdgeSolution/monitoring.$($script:monitoring_mode.ToLower()).template.json"
-    #     $monitoring_manifest = "$($root_path)/EdgeSolution/monitoring.deployment.json"
-    #     Remove-Item -Path $monitoring_manifest -ErrorAction Ignore
-
-    #     (Get-Content -Path $monitoring_template -Raw) | ForEach-Object {
-    #         $_ -replace '__WORKSPACE_ID__', $script:deployment_output.properties.outputs.workspaceId.value `
-    #             -replace '__SHARED_KEY__', $script:deployment_output.properties.outputs.workspaceSharedKey.value `
-    #             -replace '__HUB_RESOURCE_ID__', $script:deployment_output.properties.outputs.iotHubResourceId.value `
-    #             -replace '__UPLOAD_TARGET__', $script:monitoring_mode `
-    #             -replace '__SCRAPE_FREQUENCY__', $script:scrape_frequency `
-    #             -replace '__COMPRESS_FOR_UPLOAD__', $script:compress_for_upload
-    #     } | Set-Content -Path $monitoring_manifest
-    # }
     #endregion
 
     #region edge deployments
@@ -805,28 +1031,6 @@ function New-ELMSEnvironment() {
     #     Write-Host
     #     Write-Host -ForegroundColor Yellow "Go to https://aka.ms/edgemon-docs for more details."
     # }
-    #endregion
-
-    #region make the first module logs upload request
-    # Write-Host
-    # Write-Host "Waiting for edge deployment to be applied"
-    # Start-Sleep -Seconds 120
-
-    # Write-Host
-    # Write-Host "Invoking first module logs pull request"
-    # $attemps = 3
-    # do {
-    #     $response = Invoke-WebRequest -Method Post -Uri "https://$($script:function_app_hostname)/api/$($script:invoke_log_upload_function_name)?code=$($script:function_key)" -ErrorAction Ignore
-    #     $attemps--
-
-    #     if ($response.StatusCode -eq 200) {
-    #         Write-Host
-    #         Write-Host "First function execution submitted successfully"
-    #     }
-    #     else {
-    #         Start-Sleep -Seconds 10
-    #     }
-    # } while ($response.StatusCode -ne 200 -and $attemps -gt 0)
     #endregion
 
     #region completion message
