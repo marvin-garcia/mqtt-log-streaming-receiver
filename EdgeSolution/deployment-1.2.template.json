@@ -9,9 +9,9 @@
             "minDockerVersion": "v1.25",
             "registryCredentials": {
               "EdgeBuilds": {
-                "address": "edgebuilds.azurecr.io",
-                "password": "<Password>",
-                "username": "<Username>"
+                "address": "msiothack2022.azurecr.io",
+                "username": "msiothack2022",
+                "password": "9BXQXmmr30Jk=OcEfy9ZL5GyHt3/G3E3"
               }
             }
           }
@@ -51,7 +51,7 @@
         "modules": {
           "__OBS_MODULE_NAME__": {
             "settings": {
-              "image": "edgebuilds.azurecr.io/microsoft/azureiotedge-obsd:20220216.4-linux-amd64",
+              "image": "msiothack2022.azurecr.io/microsoft/azureiotedge-obsd:20220216.6-linux-amd64",
               "createOptions": ""
             },
             "type": "docker",
