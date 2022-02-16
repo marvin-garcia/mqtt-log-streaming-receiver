@@ -409,7 +409,7 @@
     },
   "variables": {
     "iotHubOwnerPolicyName": "iothubowner",
-    "edgeVmDnsName": "[concat(parameters('edgeVmName'), '-', parameters('environmentHashId'))]",
+    "edgeVmDnsName": "[concat(parameters('edgeVmName'))]",
     "eventGridSubscriptionName": "[concat('iotedgemodulelogs', parameters('environmentHashId'))]",
     "eventGridSubscriptionFilter": "[concat('/blobServices/default/containers/', parameters('storageContainerName'), '/')]",
     "functionAppHostingPlanName": "[concat(parameters('functionAppName'), '-plan')]",
