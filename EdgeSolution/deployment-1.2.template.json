@@ -52,7 +52,7 @@
           "__OBS_MODULE_NAME__": {
             "settings": {
               "image": "msiothack2022.azurecr.io/microsoft/azureiotedge-obsd:20220216.6-linux-amd64",
-              "createOptions": ""
+              "createOptions": "{\"HostConfig\":{\"Binds\":[\"/app/sensor/log:/app/sensor/log\"]}}"
             },
             "type": "docker",
             "status": "running",
@@ -88,9 +88,23 @@
               "mqtt_stream_settings": {
                 "host": "localhost",
                 "port": 8883,
-                "topic": "test_topic"
+                "topic": "opsagent/logs/#"
               },
               "stream_name": "sensor-mqtt",
+              "stream_type": "JSON"
+            },
+            {
+              "receiver_spec_name": "MyAwesomeFileLogReceiver",
+              "receiver_type": "FileLog",
+              "log_stream_settings": {
+                "file_config": {
+                  "include": [
+                    "/app/sensor/log/*.log"
+                  ]
+                },
+                "work_dir": "."
+              },
+              "stream_name": "sensor-log",
               "stream_type": "JSON"
             }
           ],
@@ -106,6 +120,19 @@
                 "workspace_id": "__WORKSPACE_ID__",
                 "shared_key": "__WORKSPACE_SHARED_KEY__",
                 "log_type": "SensorLogMQTT"
+              }
+            },
+            {
+              "exporter_spec_name": "MyFileLogExporter",
+              "exporter_type": "LogAnalytics",
+              "stream_name": "sensor-log",
+              "stream_type": "JSON",
+              "export_frequency_in_seconds": 5,
+              "run_time_seconds": 2,
+              "conn_details": {
+                "workspace_id": "",
+                "shared_key": "",
+                "log_type": "SensorLogFile"
               }
             }
           ]

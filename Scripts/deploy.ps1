@@ -854,10 +854,11 @@ function New-ELMSEnvironment() {
             $iotedge_cert_sas,
             $root_cert_sas,
             $iotedge_key_sas,
+            "$github_repo_url/$github_branch_name/Scripts/log-generator",
             "$github_repo_url/$github_branch_name/Scripts/edge-setup.sh",
             "$github_repo_url/$github_branch_name/Scripts/edge-setup.ps1"
         )
-        "commandToExecute" = "sudo bash edge-setup.sh --iotHubHostname '$($script:iot_hub_name).azure-devices.net' --deviceId '$script:vm_name' --certName '$iotedge_cert_name' --keyName '$iotedge_key_name' --caName '$root_cert_name'"
+        "commandToExecute" = "sudo bash edge-setup.sh --iotHubHostname '$($script:iot_hub_name).azure-devices.net' --deviceId '$script:vm_name' --certName '$iotedge_cert_name' --keyName '$iotedge_key_name' --caName '$root_cert_name' --logGenFileName log-generator"
     }
     Set-Content -Value (ConvertTo-Json $protected_settings | Out-String) -Path $protected_settings_path -Force
 
@@ -869,7 +870,7 @@ function New-ELMSEnvironment() {
         --protected-settings $protected_settings_path
     #endregion
 
-    #region Leaf devices
+    #region create leaf devices
     $script:leaf_devices = @()
     do {
         $leaf_device_options = @(
@@ -929,12 +930,12 @@ function New-ELMSEnvironment() {
     #     --settings "HostUrl=https://$($script:function_app_hostname)" "HostKey=$($script:function_key)" | Out-Null
     #endregion
 
-    #region edge deployments
-    # Create main deployment
+    #region edge deployment
     Write-Host "`r`nCreating base IoT edge device deployment"
 
     Set-MqttTopicName
     $obs_module_name = "obsd"
+    $base_topic_name = ($script:mqtt_topic_name).Split('/')[0]
     $deployment_schema = "1.2"
     $deployment_template_path = "$($root_path)/EdgeSolution/deployment-$($deployment_schema).template.json"
     $deployment_manifest_path = "$($root_path)/EdgeSolution/deployment-$($deployment_schema).manifest.json"
@@ -962,7 +963,7 @@ function New-ELMSEnvironment() {
             "allow" = @(
                 @{
                     "operations" = @( "mqtt:subscribe" )
-                    "resources"  = @( "$($script:topic_name)/#" )
+                    "resources"  = @( "$($base_topic_name)/#" )
                 }
             )
         }
@@ -979,6 +980,12 @@ function New-ELMSEnvironment() {
         --hub-name $script:iot_hub_name `
         --content $deployment_manifest_path `
         --target-condition=$script:deployment_condition | Out-Null
+
+    Write-Host "`r`nRunning log generator process."
+    az vm run-command invoke `
+    --resource-group $script:resource_group_name `
+    --name $script:vm_name `
+    --command-id RunShellScript --scripts "/app/sensor/log-generator -f 5"
     #endregion
 
     #region function app

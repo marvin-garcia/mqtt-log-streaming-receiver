@@ -7,6 +7,7 @@ while [ "$#" -gt 0 ]; do
         --certName)                        certName="$2" ;;
         --keyName)                         keyName="$2" ;;
         --caName)                          caName="$2" ;;
+        --logGenFileName)                  logGenFileName="$2" ;;
     esac
     shift
 done
@@ -50,3 +51,12 @@ sleep 3
 iotedge config apply
 iotedge system status
 echo "Iotedge running."
+
+echo "Creating sensor directory..."
+mkdir -p /app/sensor/log
+chmod -R 777 /app/sensor/
+echo "Sensor directory created."
+
+echo "Moving log generator script..."
+cp $logGenFileName /app/sensor/
+echo "Log generator script moved."
