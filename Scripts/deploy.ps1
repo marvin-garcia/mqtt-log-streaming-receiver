@@ -753,12 +753,12 @@ function New-ELMSEnvironment() {
         --edge-enabled `
         --auth-method x509_thumbprint `
         --primary-thumbprint $thumbprint `
-        --secondary-thumbprint $thumbprint
+        --secondary-thumbprint $thumbprint | Out-Null
 
     az iot hub device-twin update `
         --device-id $script:vm_name `
         --hub-name $script:iot_hub_name `
-        --tags '{ \"mqttReceiver\": true }'
+        --tags '{ \"mqttReceiver\": true }' | Out-Null
 
     $storage_key = az storage account keys list `
         --account-name $script:storage_account_name `
@@ -868,18 +868,27 @@ function New-ELMSEnvironment() {
                 --auth-method shared_private_key | Out-Null
 
             az iot hub device-identity parent set `
-                --device-id $device.device_name `
+                --device-id $device_id `
                 --parent-device-id $script:vm_name `
                 --hub-name $script:iot_hub_name | Out-Null
             
             $device_conn_str = az iot hub device-identity connection-string show `
-                --device-id $device.device_name `
+                --device-id $device_id `
                 --hub-name $script:iot_hub_name `
                 --key-type primary `
                 -o tsv
+
+            $device_sas_token = az iot hub generate-sas-token `
+                --device-id $device_id `
+                --hub-name $script:iot_hub_name `
+                --key-type primary `
+                --query 'sas' `
+                -o tsv
+
             $script:leaf_devices += @{
                 "device_id" = $device_id
                 "connection_string" = $device_conn_str
+                "sas_token" = $device_sas_token
             }
         }
     }
@@ -998,7 +1007,9 @@ function New-ELMSEnvironment() {
         Write-Host -ForegroundColor Green "IoT Leaf Devices Details:"
         foreach ($device in $script:leaf_devices) {
             Write-Host
-            Write-Host -ForegroundColor Green "$($device.device_id): $($device.connection_string)"
+            Write-Host -ForegroundColor Green "Device Id: $($device.device_id)"
+            Write-Host -ForegroundColor Green "SAS Token: $($device.sas_token)"
+            Write-Host -ForegroundColor Green "Connection String: $($device.connection_string)"
         }
     }
 
