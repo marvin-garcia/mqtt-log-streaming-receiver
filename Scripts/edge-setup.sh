@@ -37,7 +37,7 @@ cp $caName "$certdir/$caName.crt"
 cp $certName "$certdir/$certName.crt"
 cp $keyName "$certdir/$keyName.crt"
 update-ca-certificates
-chmod 644 $certdir/*pem
+chmod 644 $certdir/*crt
 echo "certificates installed."
 
 echo "Provisioning iotedge..."

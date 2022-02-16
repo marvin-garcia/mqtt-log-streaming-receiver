@@ -59,12 +59,37 @@
               "allow": [
                 {
                   "operations": [
-                    "mqtt:connect",
-                    "mqtt:publish",
+                    "mqtt:connect"
+                  ]
+                }
+              ]
+            },
+            {
+              "identities": [
+                "__IOTHUB_HOSTNAME__/sub_client"
+              ],
+              "allow": [
+                {
+                  "operations": [
                     "mqtt:subscribe"
                   ],
                   "resources": [
-                    "*"
+                    "__TOPIC_NAME__"
+                  ]
+                }
+              ]
+            },
+            {
+              "identities": [
+                "__IOTHUB_HOSTNAME__/pub_client"
+              ],
+              "allow": [
+                {
+                  "operations": [
+                    "mqtt:publish"
+                  ],
+                  "resources": [
+                    "__TOPIC_NAME__"
                   ]
                 }
               ]

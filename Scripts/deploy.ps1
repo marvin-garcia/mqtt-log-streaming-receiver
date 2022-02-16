@@ -755,6 +755,11 @@ function New-ELMSEnvironment() {
         --primary-thumbprint $thumbprint `
         --secondary-thumbprint $thumbprint
 
+    az iot hub device-twin update `
+        --device-id $script:vm_name `
+        --hub-name $script:iot_hub_name `
+        --tags '{ \"mqttReceiver\": true }'
+
     $storage_key = az storage account keys list `
         --account-name $script:storage_account_name `
         --resource-group $script:storage_account_resource_group `
@@ -882,24 +887,33 @@ function New-ELMSEnvironment() {
     #endregion
 
     #region update azure function host key app setting
-    $script:function_app_hostname = az functionapp show -g $script:resource_group_name -n $script:function_app_name --query defaultHostName -o tsv
-    $script:function_key = az functionapp keys list -g $script:resource_group_name -n $script:function_app_name --query 'functionKeys.default' -o tsv
+    # $script:function_app_hostname = az functionapp show -g $script:resource_group_name -n $script:function_app_name --query defaultHostName -o tsv
+    # $script:function_key = az functionapp keys list -g $script:resource_group_name -n $script:function_app_name --query 'functionKeys.default' -o tsv
 
-    az functionapp config appsettings set `
-        --name $script:function_app_name `
-        --resource-group $script:resource_group_name `
-        --settings "HostUrl=https://$($script:function_app_hostname)" "HostKey=$($script:function_key)" | Out-Null
+    # az functionapp config appsettings set `
+    #     --name $script:function_app_name `
+    #     --resource-group $script:resource_group_name `
+    #     --settings "HostUrl=https://$($script:function_app_hostname)" "HostKey=$($script:function_key)" | Out-Null
     #endregion
 
     #region edge deployments
     # Create main deployment
     Write-Host "`r`nCreating base IoT edge device deployment"
 
+    $topic_name = "obsagent/log"
     $deployment_schema = "1.2"
+    $deployment_template_path = "$($root_path)/EdgeSolution/deployment-$($deployment_schema).template.json"
+    $deployment_manifest_path = "$($root_path)/EdgeSolution/deployment-$($deployment_schema).manifest.json"
+
+    (Get-Content -Path $deployment_template_path -Raw) | ForEach-Object {
+        $_ -replace '__IOTHUB_HOSTNAME__', "$($script:iot_hub_name).azure-devices.net" `
+            -replace '__TOPIC_NAME__', $topic_name
+    } | Set-Content -Path $deployment_manifest_path
+
     az iot edge deployment create `
         -d "base-deployment" `
         --hub-name $script:iot_hub_name `
-        --content "$($root_path)/EdgeSolution/deployment-$($deployment_schema).manifest.json" `
+        --content $deployment_manifest_path `
         --target-condition=$script:deployment_condition | Out-Null
     #endregion
 
