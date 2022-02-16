@@ -3,8 +3,8 @@
 ## Pre-requisites
 In order to successfully deploy this solution, you will need the following:
 
-- [PowerShell 7](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.1).
-- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) version 2.21 or later.
+- [PowerShell 7](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.1) or a PowerShell [Azure Cloud Shell](https://shell.azure.com).
+- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) version 2.21 or later (not required if using Azure Cloud Shell).
 - An Azure account with an active subscription. [Create one for free](https://azure.microsoft.com/free/?ref=microsoft.com&utm_source=microsoft.com&utm_medium=docs&utm_campaign=visualstudio).
 
 ## How to use
@@ -15,8 +15,8 @@ In order to successfully deploy this solution, you will need the following:
     ```
 3. Run the code below:
     ```powershell
-    cd mqtt-log-streaming-receiver
-    .\Scripts\deploy.ps1
+    cd mqtt-log-streaming-receiver/Scripts
+    .\deploy.ps1
     ```
 4. Follow the wizard instructions
 
