@@ -106,7 +106,7 @@ function Get-LeafDeviceName {
         }
         else {
             Write-Host
-            Write-Host "Provide a name for the leaf IoT device."
+            Write-Host "Provide an id for the leaf IoT device."
             $first = $false
         }
         $device_id = Read-Host -Prompt ">"
