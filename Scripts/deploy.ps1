@@ -750,9 +750,9 @@ function New-ELMSEnvironment() {
     #endregion
 
     #region generate edge certificates
-    Import-Module "$root_path/Scripts/ca-certs.ps1"
     Set-Location "$root_path/Scripts/"
-
+    Import-Module "$root_path/Scripts/ca-certs.ps1" -Force
+    
     New-CACertsCertChain rsa
     New-CACertsEdgeDeviceIdentity "$script:vm_name"
     New-CACertsEdgeDevice "ca-cert"
