@@ -3,44 +3,82 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "location": {
-      "type": "string"
+      "type": "string",
+      "metadata": {
+        "description": "Virtual machine location"
+      }
     },
     "edgeVmName": {
-      "type": "string"
+      "type": "string",
+      "defaultValue": ""
+    },
+    "edgeVmDnsName": {
+      "type": "string",
+      "defaultValue": ""
     },
     "edgeVmSize": {
-      "type": "string"
+      "type": "string",
+      "defaultValue": ""
     },
     "adminUsername": {
-      "type": "string"
+      "type": "string",
+      "defaultValue": ""
     },
     "adminPassword": {
-      "type": "string"
+      "type": "securestring",
+      "defaultValue": ""
     },
-    "edgeSubnetId": {
-      "type": "string"
+    "vnetName": {
+      "type": "string",
+      "defaultValue": ""
     },
-    "dpsIdScope": {
-      "type": "string"
+    "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": ""
     },
-    "dpsConnectionString": {
-      "type": "securestring"
+    "edgeSubnetName": {
+      "type": "string",
+      "defaultValue": ""
     },
-    "templateUrl": {
-      "type": "string"
-    },
-    "branchName": {
-      "type": "string"
+    "edgeSubnetAddressRange": {
+      "type": "string",
+      "defaultValue": ""
     }
   },
   "variables": {
-    "dpsGlobalDomain": "[if(startsWith(parameters('location'), 'usgov'), 'azure-devices-provisioning.us', if(startsWith(parameters('location'), 'usdod'), 'azure-devices-provisioning.us', 'azure-devices-provisioning.net'))]",
-    "dpsGlobalEndpoint": "[concat('global.', variables('dpsGlobalDomain'))]",
     "edgePublicIPAddressName": "[concat(parameters('edgeVmName'), '-ip')]",
     "edgeNetworkInterfaceName": "[concat(parameters('edgeVmName'), '-nic')]",
     "edgeNetworkSecurityGroupName": "[concat(parameters('edgeVmName'), '-nsg')]"
   },
   "resources": [
+    {
+      "comments": "IoT virtual network",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2020-05-01",
+      "name": "[parameters('vnetName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('edgeNetworkSecurityGroupName'))]"
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vNetAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('edgeSubnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('edgeSubnetAddressRange')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('edgeNetworkSecurityGroupName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
     {
       "comments": "IoT edge VM network security group",
       "type": "Microsoft.Network/networkSecurityGroups",
@@ -49,20 +87,76 @@
       "location": "[parameters('location')]",
       "properties": {
         "securityRules": [
-          // {
-          //   "name": "ssh_rule",
-          //   "properties": {
-          //     "description": "Locks inbound down to ssh default port 22.",
-          //     "protocol": "Tcp",
-          //     "sourcePortRange": "*",
-          //     "destinationPortRange": "22",
-          //     "sourceAddressPrefix": "*",
-          //     "destinationAddressPrefix": "*",
-          //     "access": "Allow",
-          //     "priority": 100,
-          //     "direction": "Inbound"
-          //   }
-          // }
+          {
+            "name": "ssh_rule",
+            "properties": {
+              "description": "Locks inbound down to ssh default port 22.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "AMQP",
+            "properties": {
+              "description": "Locks inbound down to AMQP default port 5671.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5671",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "MQTT",
+            "properties": {
+              "description": "Locks inbound down to MQTT default port 8883.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8883",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 120,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "HTTPS",
+            "properties": {
+              "description": "Locks inbound down to HTTP default port 443.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 130,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "SMQTT",
+            "properties": {
+              "description": "Locks inbound down to Secure MQTT default port 1883.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "1883",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 140,
+              "direction": "Inbound"
+            }
+          }
         ]
       }
     },
@@ -75,7 +169,7 @@
       "properties": {
         "publicIPAllocationMethod": "Dynamic",
         "dnsSettings": {
-          "domainNameLabel": "[parameters('edgeVmName')]"
+          "domainNameLabel": "[parameters('edgeVmDnsName')]"
         }
       },
       "sku": {
@@ -90,6 +184,7 @@
       "location": "[parameters('location')]",
       "dependsOn": [
         "[resourceId('Microsoft.Network/publicIPAddresses', variables('edgePublicIPAddressName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
         "[resourceId('Microsoft.Network/networkSecurityGroups', variables('edgeNetworkSecurityGroupName'))]"
       ],
       "properties": {
@@ -102,7 +197,7 @@
                 "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('edgePublicIPAddressName'))]"
               },
               "subnet": {
-                "id": "[parameters('edgeSubnetId')]"
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('edgeSubnetName'))]"
               }
             }
           }
@@ -149,32 +244,6 @@
           ]
         }
       }
-    },
-    {
-      "comments": "One time script to configure and onboard the IoT edge virtual machine",
-      "type": "Microsoft.Compute/virtualMachines/extensions",
-      "name": "[concat(parameters('edgeVmName'), '/', 'scriptextensions')]",
-      "apiVersion": "2019-03-01",
-      "location": "[parameters('location')]",
-      "properties": {
-        "publisher": "Microsoft.Azure.Extensions",
-        "type": "CustomScript",
-        "typeHandlerVersion": "2.0",
-        "autoUpgradeMinorVersion": true,
-        "settings": {
-          "fileUris": [
-            "[concat(parameters('templateUrl'), '/', parameters('branchName'), '/Scripts/dps-enroll.ps1')]",
-            "[concat(parameters('templateUrl'), '/', parameters('branchName'), '/Scripts/edge-setup.ps1')]",
-            "[concat(parameters('templateUrl'), '/', parameters('branchName'), '/Scripts/edge-setup.sh')]"
-          ]
-        },
-        "protectedSettings": {
-          "commandToExecute": "[concat('sudo bash edge-setup.sh --idScope \"', parameters('dpsIdScope'), '\" --dpsConnString \"', parameters('dpsConnectionString'), '\"', ' --dpsGlobalEndpoint ', '\"', 'https://', variables('dpsGlobalEndpoint'), '\"')]"
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', parameters('edgeVmName'))]"
-      ]
     }
   ]
 }

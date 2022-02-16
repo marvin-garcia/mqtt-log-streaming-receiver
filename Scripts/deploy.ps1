@@ -117,10 +117,10 @@ function Get-IoTDeviceId {
 
 function Set-MqttTopicName {
 
-    $script:topic_name = $null
+    $script:mqtt_topic_name = $null
     $first = $true
 
-    while ([string]::IsNullOrEmpty($script:topic_name) -or ($script:topic_name -notmatch "^[a-z0-9_\/]*$")) {
+    while ([string]::IsNullOrEmpty($script:mqtt_topic_name) -or ($script:mqtt_topic_name -notmatch "^[a-z0-9_\/]*$")) {
         if ($first -eq $false) {
             Write-Host "Use alphanumeric characters as well as '_' and '/'. For example: 'observability/logs'."
         }
@@ -129,9 +129,9 @@ function Set-MqttTopicName {
             Write-Host "Provide topic name each device will publish logs to. Default value is 'obsagent/log'."
             $first = $false
         }
-        $script:topic_name = Read-Host -Prompt "> (obsagent/log)"
-        if ([string]::IsNullOrEmpty($script:topic_name)) {
-            $script:topic_name = "obsagent/log"
+        $script:mqtt_topic_name = Read-Host -Prompt "> (obsagent/log)"
+        if ([string]::IsNullOrEmpty($script:mqtt_topic_name)) {
+            $script:mqtt_topic_name = "obsagent/log"
         }
     }
 }
@@ -495,18 +495,6 @@ function New-ELMSEnvironment() {
     # set azure susbcription
     Set-AzureAccount
 
-    #region deployment option
-    # $deployment_options = @(
-    #     "Create a sandbox environment",
-    #     "Custom deployment"
-    # )
-
-    # $deployment_option = Get-InputSelection `
-    #     -options $deployment_options `
-    #     -text "Choose a deployment option from the list (using its Index):"
-    $deployment_option = 1
-    #endregion
-
     #region obtain resource group name
     if ($deployment_option -eq 1 -or $deployment_option -eq 2) {
         
@@ -522,124 +510,18 @@ function New-ELMSEnvironment() {
     }
     #endregion
 
-    if ($deployment_option -eq 1) {
-
-        $script:sandbox = $true
-
-        Set-IoTHub
-        Set-Storage
-        Set-LogAnalyticsWorkspace
-    }
-
-    elseif ($deployment_option -eq 2) {
-
-        #region iot hub
-        Set-IoTHub
-
-        if (!$script:create_iot_hub) {
-
-            #region handle IoT hub service policy
-            $iot_hub_policies = az iot hub policy list --hub-name $script:iot_hub_name | ConvertFrom-Json
-            $iot_hub_policy = $iot_hub_policies | Where-Object { $_.rights -like '*serviceconnect*' -and $_.rights -like '*registryread*' }
-
-            if (!$iot_hub_policy) {
-                
-                $script:iot_hub_policy_name = "iotedgelogs"
-                Write-Host
-                Write-Host "Creating IoT hub shared access policy '$($script:iot_hub_policy_name)' with permissions 'RegistryRead ServiceConnect'."
-                
-                az iot hub policy create `
-                    --hub-name $script:iot_hub_name `
-                    --name $script:iot_hub_policy_name `
-                    --permissions RegistryRead ServiceConnect
-            }
-            else {
-                
-                $script:iot_hub_policy_name = $iot_hub_policy.keyName
-                Write-Host
-                Write-Host "The existing IoT hub shared access policy '$($script:iot_hub_policy_name)' will be used in the deployment."
-            }
-            #endregion
-
-            Write-Host
-            Write-Host -ForegroundColor Yellow "IMPORTANT: You must update device twin for your IoT edge devices with `"$($script:deployment_condition)`" to collect logs from their modules."
-            
-            Start-Sleep -Milliseconds 1500
-            
-            Write-Host
-            Write-Host "Press Enter to continue."
-            Read-Host
-        }
-        #endregion
-
-        #region storage account
-        Set-Storage
-
-        if (!$script:create_event_grid) {
-            Write-Host
-            Write-Host "The existing event grid system topic '$($script:event_grid_topic_name)' will be used in the deployment."
-        }
-        #endregion
-
-        #region log analytics
-        Set-LogAnalyticsWorkspace
-        #endregion
-    }
-    
-    #region metrics monitoring
-    # if ($script:sandbox) {
-    #     $script:enable_monitoring = $true
-    #     $script:monitoring_mode = "IoTMessage"
-    # }
-    # else {
-    #     $option = Get-InputSelection `
-    #         -options @("Yes", "No") `
-    #         -text @("In addition to logging, ELMS can enable IoT Edge monitoring with Azure Monitor. It will let you monitor your edge fleet at scale by using Azure Monitor to collect, store, visualize and generate alerts from metrics emitted by the IoT Edge runtime.", "Do you want to enable IoT Edge monitoring? Choose an option from the list (using its Index):") `
-    #         -default_index 1
-        
-    #     if ($option -eq 1) {
-    #         $script:enable_monitoring = $true
-    #     }
-    # }
-
-    # region select monitoring type
-    # if ($script:enable_monitoring -and $null -eq $script:monitoring_mode) {
-
-    #     $option = Get-InputSelection `
-    #         -options @("To Log Analytics", "As IoT messages") `
-    #         -text @("Collected monitoring metrics can be uploaded directly to Log Analytics (requires outbound internet connectivity from the edge device(s)), or can be published as IoT messages (useful for local consumption). Metrics published as IoT messages are emitted as UTF8-encoded json from the endpoint '/messages/modules//outputs/metricOutput'.", "How should metrics be uploaded? Choose an option from the list (using its Index):")
-        
-    #     if ($option -eq 1) {
-    #         Write-Host
-    #         Write-Host -ForegroundColor Yellow "NOTE: Monitoring metrics will be sent directly from the edge to a log analytics workspace Log analytics workspace. Go to https://aka.ms/edgemon-docs to find more details."
-
-    #         $script:monitoring_mode = "AzureMonitor"
-    #         $script:create_event_hubs = $false
-    #     }
-    #     elseif ($option -eq 2) {
-    #         Write-Host
-    #         Write-Host -ForegroundColor Yellow "NOTE: Monitoring metrics will be routed from IoT hub to an event hubs instance and processed by an Azure Function."
-
-    #         $script:monitoring_mode = "IoTMessage"
-    #         $script:create_event_hubs = $true
-    #     }
-    # }
-
+    $script:sandbox = $true
     $script:enable_monitoring = $false
-    #endregion
+    $script:create_event_hubs_namespace = $false
+    $script:create_event_hubs = $false
 
-    if ($script:enable_monitoring) {
-        Set-EventHubsNamespace -route_condition  "id = '$metrics_collector_message_id'"
-    }
-    else {
-        $script:create_event_hubs_namespace = $false
-        $script:create_event_hubs = $false
-    }
-    #endregion
+    Set-IoTHub
+    Set-Storage
+    Set-LogAnalyticsWorkspace
 
     #region obtain deployment location
     if ($script:create_iot_hub) {
-        $locations = Get-ResourceProviderLocations -provider 'Microsoft.Devices' -typeName 'ProvisioningServices'
+        $locations = Get-ResourceProviderLocations -provider 'Microsoft.Devices' -typeName 'IotHubs' | Sort-Object
 
         $option = Get-InputSelection `
             -options $locations `
@@ -679,57 +561,26 @@ function New-ELMSEnvironment() {
     #endregion
 
     #region create deployment
-
     Set-EdgeInfrastructure
 
     $template_parameters = @{
         "location"                    = @{ "value" = $script:iot_hub_location }
         "environmentHashId"           = @{ "value" = $script:env_hash }
-        "createIoTHub"                = @{ "value" = $script:create_iot_hub }
-        "iotHubLocation"              = @{ "value" = $script:iot_hub_location }
         "iotHubName"                  = @{ "value" = $script:iot_hub_name }
-        "iotHubResourceGroup"         = @{ "value" = $script:iot_hub_resource_group }
         "iotHubServicePolicyName"     = @{ "value" = $script:iot_hub_policy_name }
-        "createStorageAccount"        = @{ "value" = $script:create_storage }
-        "storageAccountLocation"      = @{ "value" = $script:storage_account_location }
+        "edgeVmName"                  = @{ "value" = $script:vm_name }
+        "edgeVmSize"                  = @{ "value" = $script:vm_size }
+        "adminUsername"               = @{ "value" = $script:vm_username }
+        "adminPassword"               = @{ "value" = $script:vm_password }
+        "vnetName"                    = @{ "value" = $script:vnet_name }
+        "vnetAddressPrefix"           = @{ "value" = $script:vnet_addr_prefix }
+        "edgeSubnetName"              = @{ "value" = $script:subnet_name }
+        "edgeSubnetAddressRange"      = @{ "value" = $script:subnet_addr_prefix }
         "storageAccountName"          = @{ "value" = $script:storage_account_name }
-        "storageAccountResourceGroup" = @{ "value" = $script:storage_account_resource_group }
         "storageContainerName"        = @{ "value" = $script:storage_container_name }
-        "storageQueueName"            = @{ "value" = $script:storage_queue_name }
-        "createEventGridSystemTopic"  = @{ "value" = $script:create_event_grid }
-        "eventGridSystemTopicName"    = @{ "value" = $script:event_grid_topic_name }
-        "createWorkspace"             = @{ "value" = $script:create_workspace }
-        "workspaceLocation"           = @{ "value" = $script:workspace_location }
         "workspaceName"               = @{ "value" = $script:workspace_name }
-        "workspaceResourceGroup"      = @{ "value" = $script:workspace_resource_group }
-        "functionAppName"             = @{ "value" = $script:function_app_name }
         "templateUrl"                 = @{ "value" = $github_repo_url }
         "branchName"                  = @{ "value" = $github_branch_name }
-    }
-
-    if ($script:create_iot_hub) {
-        $template_parameters.Add("edgeVmName", @{ "value" = $script:vm_name })
-        $template_parameters.Add("edgeVmSize", @{ "value" = $script:vm_size })
-        $template_parameters.Add("adminUsername", @{ "value" = $script:vm_username })
-        $template_parameters.Add("adminPassword", @{ "value" = $script:vm_password })
-        $template_parameters.Add("vnetName", @{ "value" = $script:vnet_name })
-        $template_parameters.Add("vnetAddressPrefix", @{ "value" = $script:vnet_addr_prefix })
-        $template_parameters.Add("edgeSubnetName", @{ "value" = $script:subnet_name })
-        $template_parameters.Add("edgeSubnetAddressRange", @{ "value" = $script:subnet_addr_prefix })
-    }
-
-    $template_parameters.Add("createEventHubsNamespace", @{ "value" = $script:create_event_hubs_namespace })
-    $template_parameters.Add("createEventHubs", @{ "value" = $script:create_event_hubs })
-    if ($script:create_event_hubs) {
-        $template_parameters.Add("eventHubResourceGroup", @{ "value" = $script:event_hubs_resource_group })
-        $template_parameters.Add("eventHubsLocation", @{ "value" = $script:event_hubs_location })
-        $template_parameters.Add("eventHubsNamespace", @{ "value" = $script:event_hubs_namespace })
-        $template_parameters.Add("eventHubsName", @{ "value" = $script:event_hubs_name })
-        $template_parameters.Add("eventHubsEndpointName", @{ "value" = $script:event_hubs_endpoint })
-        $template_parameters.Add("eventHubsRouteName", @{ "value" = $script:event_hubs_route })
-        $template_parameters.Add("eventHubsRouteCondition", @{ "value" = $script:event_hubs_route_condition })
-        $template_parameters.Add("eventHubsListenPolicyName", @{ "value" = $script:event_hubs_listen_rule })
-        $template_parameters.Add("eventHubsSendPolicyName", @{ "value" = $script:event_hubs_send_rule })
     }
 
     Set-Content -Path "$($root_path)/Templates/azuredeploy.parameters.json" -Value (ConvertTo-Json $template_parameters -Depth 5)
@@ -920,16 +771,6 @@ function New-ELMSEnvironment() {
     while ($leaf_device_option -eq 1)
     #endregion
 
-    #region update azure function host key app setting
-    # $script:function_app_hostname = az functionapp show -g $script:resource_group_name -n $script:function_app_name --query defaultHostName -o tsv
-    # $script:function_key = az functionapp keys list -g $script:resource_group_name -n $script:function_app_name --query 'functionKeys.default' -o tsv
-
-    # az functionapp config appsettings set `
-    #     --name $script:function_app_name `
-    #     --resource-group $script:resource_group_name `
-    #     --settings "HostUrl=https://$($script:function_app_hostname)" "HostKey=$($script:function_key)" | Out-Null
-    #endregion
-
     #region edge deployment
     Write-Host "`r`nCreating base IoT edge device deployment"
 
@@ -954,7 +795,7 @@ function New-ELMSEnvironment() {
             "allow" = @(
                 @{
                     "operations" = @( "mqtt:publish" )
-                    "resources"  = @( "$($script:topic_name)/{{iot:device_id}}" )
+                    "resources"  = @( "$($script:mqtt_topic_name)/{{iot:device_id}}" )
                 }
             )
         },
@@ -986,64 +827,6 @@ function New-ELMSEnvironment() {
     --resource-group $script:resource_group_name `
     --name $script:vm_name `
     --command-id RunShellScript --scripts "/app/sensor/log-generator -f 5"
-    #endregion
-
-    #region function app
-    # Write-Host
-    # Write-Host "Deploying code to Function App $script:function_app_name"
-    
-    # az functionapp deployment source config-zip -g $script:resource_group_name -n $script:function_app_name --src $script:zip_package_path | Out-Null
-
-    # if (!$script:create_event_hubs) {
-
-    #     az functionapp config appsettings set --resource-group $script:resource_group_name --name $script:function_app_name --settings "AzureWebJobs.CollectMetrics.Disabled=true" | Out-Null
-    # }
-    # #endregion
-
-    # #region notify of monitoring deployment steps
-    # if (!$script:create_iot_hub -and $script:enable_monitoring) {
-        
-    #     #region create custom endpoint and message route
-    #     if ($script:monitoring_mode -eq "IoTMessage") {
-    #         Write-Host
-    #         Write-Host "Creating IoT hub routing endpoint"
-
-    #         $script:iot_hub_endpoint_name = "metricscollector-$($script:env_hash)"
-    #         $script:iot_hub_route_name = "metricscollector-$($script:env_hash)"
-    #         $eh_conn_string = "Endpoint=sb://$($script:deployment_output.properties.outputs.eventHubsNamespaceEndpoint.value);SharedAccessKeyName=$($script:event_hubs_send_rule);SharedAccessKey=$($script:deployment_output.properties.outputs.eventHubsSendKey.value);EntityPath=$($script:event_hubs_name)"
-
-    #         az iot hub routing-endpoint create `
-    #             --resource-group $script:iot_hub_resource_group `
-    #             --hub-name $script:iot_hub_name `
-    #             --endpoint-type eventhub `
-    #             --endpoint-name $script:iot_hub_endpoint_name `
-    #             --endpoint-resource-group $script:resource_group_name `
-    #             --endpoint-subscription-id $(az account show --query id -o tsv) `
-    #             --connection-string $eh_conn_string | ConvertFrom-Json | Out-Null
-
-    #         Write-Host
-    #         Write-Host "Creating IoT hub route"
-
-    #         az iot hub route create `
-    #             --resource-group $script:iot_hub_resource_group `
-    #             --hub-name $script:iot_hub_name `
-    #             --endpoint-name $script:iot_hub_endpoint_name `
-    #             --source-type DeviceMessages `
-    #             --route-name $script:iot_hub_route_name `
-    #             --condition $event_hubs_route_condition `
-    #             --enabled true | ConvertFrom-Json | Out-Null
-    #     }
-    #     #endregion
-
-    #     Write-Host
-    #     Write-Host -ForegroundColor Yellow "IMPORTANT: To start collecting metrics for your edge devices, you must create an IoT edge deployment with the Azure Monitor module. You can use the deployment manifest below on IoT hub '$($script:iot_hub_name)'."
-
-    #     Write-Host
-    #     Write-Host -ForegroundColor Yellow $(Get-Content $monitoring_manifest) -Separator "`r`n"
-
-    #     Write-Host
-    #     Write-Host -ForegroundColor Yellow "Go to https://aka.ms/edgemon-docs for more details."
-    # }
     #endregion
 
     #region completion message

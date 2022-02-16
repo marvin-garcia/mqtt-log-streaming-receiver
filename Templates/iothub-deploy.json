@@ -2,10 +2,7 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "createIoTHub": {
-      "type": "bool"
-    },
-    "iotHubLocation": {
+    "location": {
       "type": "string"
     },
     "iotHubName": {
@@ -31,69 +28,22 @@
     },
     "iotHubServicePolicyName": {
       "type": "string"
-    },
-    "edgeVmName": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "edgeVmDnsName": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "edgeVmSize": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "adminUsername": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "adminPassword": {
-      "type": "securestring",
-      "defaultValue": ""
-    },
-    "vnetName": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "vnetAddressPrefix": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "edgeSubnetName": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "edgeSubnetAddressRange": {
-      "type": "string",
-      "defaultValue": ""
-    },
-    "templateUrl": {
-      "type": "string"
-    },
-    "branchName": {
-      "type": "string"
     }
   },
   "variables": {
-    "iotHubDomain": "[if(startsWith(parameters('iotHubLocation'), 'usgov'), '.azure-devices.us', if(startsWith(parameters('iotHubLocation'), 'usdod'), '.azure-devices.us', '.azure-devices.net'))]",
     "iotHubEventsRoute": "events",
     "iotHubId": "[resourceId(resourceGroup().name, 'Microsoft.Devices/Iothubs', parameters('iotHubName'))]",
     "iotHubOwnerKeysId": "[resourceId(resourceGroup().name, 'Microsoft.Devices/Iothubs/IoTHubKeys', parameters('iotHubName'), parameters('iotHubOwnerPolicyName'))]",
     "iotHubServiceKeysId": "[resourceId(resourceGroup().name, 'Microsoft.Devices/Iothubs/IoTHubKeys', parameters('iotHubName'), parameters('iotHubServicePolicyName'))]",
-    "iotHubApiVersion": "[providers('Microsoft.Devices', 'IoTHubs').apiVersions[0]]",
-    "edgePublicIPAddressName": "[concat(parameters('edgeVmName'), '-ip')]",
-    "edgeNetworkInterfaceName": "[concat(parameters('edgeVmName'), '-nic')]",
-    "edgeNetworkSecurityGroupName": "[concat(parameters('edgeVmName'), '-nsg')]"
+    "iotHubApiVersion": "[providers('Microsoft.Devices', 'IoTHubs').apiVersions[0]]"
   },
   "resources": [
     {
       "comments": "Azure IoT Hub",
-      "condition": "[parameters('createIoTHub')]",
       "apiVersion": "2020-07-10-preview",
       "type": "Microsoft.Devices/Iothubs",
       "name": "[parameters('iotHubName')]",
-      "location": "[parameters('iotHubLocation')]",
+      "location": "[parameters('location')]",
       "sku": {
         "name": "[parameters('iotHubSku')]",
         "tier": "[parameters('iotHubTier')]",
@@ -101,7 +51,7 @@
       },
       "dependsOn": [],
       "properties": {
-        "location": "[parameters('iotHubLocation')]",
+        "location": "[parameters('location')]",
         "authorizationPolicies": [
           {
             "keyName": "[parameters('iotHubOwnerPolicyName')]",
@@ -164,205 +114,6 @@
           }
         },
         "features": "None"
-      }
-    },
-    {
-      "comments": "IoT virtual network",
-      "condition": "[parameters('createIoTHub')]",
-      "type": "Microsoft.Network/virtualNetworks",
-      "apiVersion": "2020-05-01",
-      "name": "[parameters('vnetName')]",
-      "location": "[parameters('iotHubLocation')]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('edgeNetworkSecurityGroupName'))]"
-      ],
-      "properties": {
-        "addressSpace": {
-          "addressPrefixes": [
-            "[parameters('vNetAddressPrefix')]"
-          ]
-        },
-        "subnets": [
-          {
-            "name": "[parameters('edgeSubnetName')]",
-            "properties": {
-              "addressPrefix": "[parameters('edgeSubnetAddressRange')]",
-              "networkSecurityGroup": {
-                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('edgeNetworkSecurityGroupName'))]"
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "comments": "IoT edge VM network security group",
-      "condition": "[parameters('createIoTHub')]",
-      "type": "Microsoft.Network/networkSecurityGroups",
-      "apiVersion": "2020-05-01",
-      "name": "[variables('edgeNetworkSecurityGroupName')]",
-      "location": "[parameters('iotHubLocation')]",
-      "properties": {
-        "securityRules": [
-          {
-            "name": "ssh_rule",
-            "properties": {
-              "description": "Locks inbound down to ssh default port 22.",
-              "protocol": "Tcp",
-              "sourcePortRange": "*",
-              "destinationPortRange": "22",
-              "sourceAddressPrefix": "*",
-              "destinationAddressPrefix": "*",
-              "access": "Allow",
-              "priority": 100,
-              "direction": "Inbound"
-            }
-          },
-          {
-            "name": "AMQP",
-            "properties": {
-              "description": "Locks inbound down to AMQP default port 5671.",
-              "protocol": "Tcp",
-              "sourcePortRange": "*",
-              "destinationPortRange": "5671",
-              "sourceAddressPrefix": "*",
-              "destinationAddressPrefix": "*",
-              "access": "Allow",
-              "priority": 110,
-              "direction": "Inbound"
-            }
-          },
-          {
-            "name": "MQTT",
-            "properties": {
-              "description": "Locks inbound down to MQTT default port 8883.",
-              "protocol": "Tcp",
-              "sourcePortRange": "*",
-              "destinationPortRange": "8883",
-              "sourceAddressPrefix": "*",
-              "destinationAddressPrefix": "*",
-              "access": "Allow",
-              "priority": 120,
-              "direction": "Inbound"
-            }
-          },
-          {
-            "name": "HTTPS",
-            "properties": {
-              "description": "Locks inbound down to HTTP default port 443.",
-              "protocol": "Tcp",
-              "sourcePortRange": "*",
-              "destinationPortRange": "443",
-              "sourceAddressPrefix": "*",
-              "destinationAddressPrefix": "*",
-              "access": "Allow",
-              "priority": 130,
-              "direction": "Inbound"
-            }
-          },
-          {
-            "name": "SMQTT",
-            "properties": {
-              "description": "Locks inbound down to Secure MQTT default port 1883.",
-              "protocol": "Tcp",
-              "sourcePortRange": "*",
-              "destinationPortRange": "1883",
-              "sourceAddressPrefix": "*",
-              "destinationAddressPrefix": "*",
-              "access": "Allow",
-              "priority": 140,
-              "direction": "Inbound"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "comments": "IoT edge VM public IP address",
-      "condition": "[parameters('createIoTHub')]",
-      "type": "Microsoft.Network/publicIPAddresses",
-      "apiVersion": "2020-05-01",
-      "name": "[variables('edgePublicIPAddressName')]",
-      "location": "[parameters('iotHubLocation')]",
-      "properties": {
-        "publicIPAllocationMethod": "Dynamic",
-        "dnsSettings": {
-          "domainNameLabel": "[parameters('edgeVmDnsName')]"
-        }
-      },
-      "sku": {
-        "name": "Basic"
-      }
-    },
-    {
-      "comments": "IoT edge VM network interface",
-      "condition": "[parameters('createIoTHub')]",
-      "type": "Microsoft.Network/networkInterfaces",
-      "apiVersion": "2020-05-01",
-      "name": "[variables('edgeNetworkInterfaceName')]",
-      "location": "[parameters('iotHubLocation')]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/publicIPAddresses', variables('edgePublicIPAddressName'))]",
-        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
-        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('edgeNetworkSecurityGroupName'))]"
-      ],
-      "properties": {
-        "ipConfigurations": [
-          {
-            "name": "ipconfig1",
-            "properties": {
-              "privateIPAllocationMethod": "Dynamic",
-              "publicIPAddress": {
-                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('edgePublicIPAddressName'))]"
-              },
-              "subnet": {
-                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('edgeSubnetName'))]"
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "comments": "IoT edge virtual machine",
-      "condition": "[parameters('createIoTHub')]",
-      "type": "Microsoft.Compute/virtualMachines",
-      "apiVersion": "2019-12-01",
-      "name": "[parameters('edgeVmName')]",
-      "location": "[parameters('iotHubLocation')]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/networkInterfaces', variables('edgeNetworkInterfaceName'))]"
-      ],
-      "properties": {
-        "hardwareProfile": {
-          "vmSize": "[parameters('edgeVmSize')]"
-        },
-        "osProfile": {
-          "computerName": "[parameters('edgeVmName')]",
-          "adminUsername": "[parameters('adminUsername')]",
-          "adminPassword": "[parameters('adminPassword')]",
-          "linuxConfiguration": {
-            "disablePasswordAuthentication": false
-          }
-        },
-        "storageProfile": {
-          "imageReference": {
-            "publisher": "canonical",
-            "offer": "0001-com-ubuntu-server-focal",
-            "sku": "20_04-lts-gen2",
-            "version": "latest"
-          },
-          "osDisk": {
-            "createOption": "fromImage"
-          }
-        },
-        "networkProfile": {
-          "networkInterfaces": [
-            {
-              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('edgeNetworkInterfaceName'))]"
-            }
-          ]
-        }
       }
     }
   ],
