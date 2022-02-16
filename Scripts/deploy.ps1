@@ -492,21 +492,16 @@ function New-ELMSEnvironment() {
     }
     #endregion
 
-    # set azure susbcription
+    #region set azure susbcription and resource group
     Set-AzureAccount
+    Set-ResourceGroupName
 
-    #region obtain resource group name
-    if ($deployment_option -eq 1 -or $deployment_option -eq 2) {
-        
-        Set-ResourceGroupName
-
-        Write-Host
-        if ($script:create_resource_group) {
-            Write-Host "Resource group '$script:resource_group_name' does not exist. It will be created later in the deployment."
-        }
-        else {
-            Write-Host "Resource group '$script:resource_group_name' already exists in current subscription."
-        }
+    Write-Host
+    if ($script:create_resource_group) {
+        Write-Host "Resource group '$script:resource_group_name' does not exist. It will be created later in the deployment."
+    }
+    else {
+        Write-Host "Resource group '$script:resource_group_name' already exists in current subscription."
     }
     #endregion
 
@@ -772,8 +767,6 @@ function New-ELMSEnvironment() {
     #endregion
 
     #region edge deployment
-    Write-Host "`r`nCreating base IoT edge device deployment"
-
     Set-MqttTopicName
     $obs_module_name = "obsd"
     $base_topic_name = ($script:mqtt_topic_name).Split('/')[0]
@@ -816,6 +809,7 @@ function New-ELMSEnvironment() {
             -replace '__WORKSPACE_SHARED_KEY__', $script:deployment_output.properties.outputs.workspaceSharedKey.value
     } | Set-Content -Path $deployment_manifest_path
 
+    Write-Host "`r`nCreating base IoT edge device deployment"
     az iot edge deployment create `
         -d "base-deployment" `
         --hub-name $script:iot_hub_name `
@@ -826,7 +820,7 @@ function New-ELMSEnvironment() {
     az vm run-command invoke `
     --resource-group $script:resource_group_name `
     --name $script:vm_name `
-    --command-id RunShellScript --scripts "/app/sensor/log-generator -f 5"
+    --command-id RunShellScript --scripts "/app/sensor/log-generator -f 5 &"
     #endregion
 
     #region completion message
