@@ -94,24 +94,45 @@ function Set-ResourceGroupName {
     }
 }
 
-function Get-LeafDeviceName {
+function Get-IoTDeviceId {
     param()
 
     $device_id = $null
     $first = $true
 
-    while ([string]::IsNullOrEmpty($device_id) -or ($leaf_device_option -notmatch "^[a-z0-9-]*$")) {
+    while ([string]::IsNullOrEmpty($device_id) -or ($device_id -notmatch "^[a-z0-9-]*$")) {
         if ($first -eq $false) {
             Write-Host "Use alphanumeric characters as well as '-'."
         }
         else {
             Write-Host
-            Write-Host "Provide an id for the leaf IoT device."
+            Write-Host "Provide an Id for the IoT device."
             $first = $false
         }
         $device_id = Read-Host -Prompt ">"
 
         return $device_id
+    }
+}
+
+function Set-MqttTopicName {
+
+    $script:topic_name = $null
+    $first = $true
+
+    while ([string]::IsNullOrEmpty($script:topic_name) -or ($script:topic_name -notmatch "^[a-z0-9_\/]*$")) {
+        if ($first -eq $false) {
+            Write-Host "Use alphanumeric characters as well as '_' and '/'. For example: 'observability/logs'."
+        }
+        else {
+            Write-Host
+            Write-Host "Provide topic name each device will publish logs to. Default value is 'obsagent/log'."
+            $first = $false
+        }
+        $script:topic_name = Read-Host -Prompt "> (obsagent/log)"
+        if ([string]::IsNullOrEmpty($script:topic_name)) {
+            $script:topic_name = "obsagent/log"
+        }
     }
 }
 
@@ -475,14 +496,15 @@ function New-ELMSEnvironment() {
     Set-AzureAccount
 
     #region deployment option
-    $deployment_options = @(
-        "Create a sandbox environment",
-        "Custom deployment"
-    )
+    # $deployment_options = @(
+    #     "Create a sandbox environment",
+    #     "Custom deployment"
+    # )
 
-    $deployment_option = Get-InputSelection `
-        -options $deployment_options `
-        -text "Choose a deployment option from the list (using its Index):"
+    # $deployment_option = Get-InputSelection `
+    #     -options $deployment_options `
+    #     -text "Choose a deployment option from the list (using its Index):"
+    $deployment_option = 1
     #endregion
 
     #region obtain resource group name
@@ -861,7 +883,7 @@ function New-ELMSEnvironment() {
         
         if ($leaf_device_option -eq 1) {
 
-            $device_id = Get-LeafDeviceName
+            $device_id = Get-IoTDeviceId
             az iot hub device-identity create `
                 --device-id $device_id `
                 --hub-name $script:iot_hub_name `
@@ -890,6 +912,8 @@ function New-ELMSEnvironment() {
                 "connection_string" = $device_conn_str
                 "sas_token" = $device_sas_token
             }
+
+            Write-Host "Leaf device created."
         }
     }
     while ($leaf_device_option -eq 1)
@@ -909,14 +933,45 @@ function New-ELMSEnvironment() {
     # Create main deployment
     Write-Host "`r`nCreating base IoT edge device deployment"
 
-    $topic_name = "obsagent/log"
+    Set-MqttTopicName
+    $obs_module_name = "obsd"
     $deployment_schema = "1.2"
     $deployment_template_path = "$($root_path)/EdgeSolution/deployment-$($deployment_schema).template.json"
     $deployment_manifest_path = "$($root_path)/EdgeSolution/deployment-$($deployment_schema).manifest.json"
 
+    $mqtt_broker_auth = @(
+        @{
+            "identities" = @( "{{iot:identity}}" )
+            "allow" = @(
+                @{
+                    "operations" = @( "mqtt:connect" )
+                }
+            )
+        },
+        @{
+            "identities" = @( "$($script:iot_hub_name).azure-devices.net/{{iot:device_id}}" )
+            "allow" = @(
+                @{
+                    "operations" = @( "mqtt:publish" )
+                    "resources"  = @( "$($script:topic_name)/{{iot:device_id}}" )
+                }
+            )
+        },
+        @{
+            "identities" = @( "$($script:iot_hub_name).azure-devices.net/{{iot:this_device_id}}/$($obs_module_name)" )
+            "allow" = @(
+                @{
+                    "operations" = @( "mqtt:subscribe" )
+                    "resources"  = @( "$($script:topic_name)/#" )
+                }
+            )
+        }
+    )
     (Get-Content -Path $deployment_template_path -Raw) | ForEach-Object {
-        $_ -replace '__IOTHUB_HOSTNAME__', "$($script:iot_hub_name).azure-devices.net" `
-            -replace '__TOPIC_NAME__', $topic_name
+        $_ -replace '__OBS_MODULE_NAME__', $obs_module_name `
+            -replace '__MQTT_BROKER_AUTH__', (ConvertTo-Json -InputObject $mqtt_broker_auth -Depth 10 | Out-String) `
+            -replace '__WORKSPACE_ID__', $script:deployment_output.properties.outputs.workspaceId.value `
+            -replace '__WORKSPACE_SHARED_KEY__', $script:deployment_output.properties.outputs.workspaceSharedKey.value
     } | Set-Content -Path $deployment_manifest_path
 
     az iot edge deployment create `

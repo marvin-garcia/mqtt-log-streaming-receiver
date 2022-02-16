@@ -26,6 +26,9 @@
               "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}],\"443/tcp\":[{\"HostPort\":\"443\"}],\"1883/tcp\":[{\"HostPort\":\"1883\"}]}}}"
             },
             "env": {
+              "SslProtocols": {
+                "value": "tls1.2"
+              },
               "experimentalFeatures__mqttBrokerEnabled": {
                 "value": "true"
               },
@@ -38,7 +41,18 @@
             }
           }
         },
-        "modules": {}
+        "modules": {
+          "__OBS_MODULE_NAME__": {
+            "settings": {
+              "image": "edgebuilds.azurecr.io/microsoft/azureiotedge-obsd:20220216.4-linux-amd64",
+              "createOptions": ""
+            },
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "version": "1.0"
+          }
+        }
       }
     },
     "$edgeHub": {
@@ -51,48 +65,41 @@
           "timeToLiveSecs": 7200
         },
         "mqttBroker": {
-          "authorizations": [
+          "authorizations": __MQTT_BROKER_AUTH__
+        }
+      }
+    },
+    "__OBS_MODULE_NAME__": {
+      "properties.desired": {
+        "obsd_config": {
+          "log_level": "info",
+          "store_forward_file_path": "./kvstore.json",
+          "receiver_specs": [
             {
-              "identities": [
-                "{{iot:identity}}"
-              ],
-              "allow": [
-                {
-                  "operations": [
-                    "mqtt:connect"
-                  ]
-                }
-              ]
-            },
+              "receiver_spec_name": "MyAwesomeMqttLogReceiver",
+              "receiver_type": "MqttLog",
+              "mqtt_stream_settings": {
+                "host": "localhost",
+                "port": 8883,
+                "topic": "test_topic"
+              },
+              "stream_name": "sensor-mqtt",
+              "stream_type": "JSON"
+            }
+          ],
+          "exporter_specs": [
             {
-              "identities": [
-                "__IOTHUB_HOSTNAME__/sub_client"
-              ],
-              "allow": [
-                {
-                  "operations": [
-                    "mqtt:subscribe"
-                  ],
-                  "resources": [
-                    "__TOPIC_NAME__"
-                  ]
-                }
-              ]
-            },
-            {
-              "identities": [
-                "__IOTHUB_HOSTNAME__/pub_client"
-              ],
-              "allow": [
-                {
-                  "operations": [
-                    "mqtt:publish"
-                  ],
-                  "resources": [
-                    "__TOPIC_NAME__"
-                  ]
-                }
-              ]
+              "exporter_spec_name": "MyMqttLogExporter",
+              "exporter_type": "LogAnalytics",
+              "stream_name": "sensor-mqtt",
+              "stream_type": "JSON",
+              "export_frequency_in_seconds": 5,
+              "run_time_seconds": 2,
+              "conn_details": {
+                "workspace_id": "__WORKSPACE_ID__",
+                "shared_key": "__WORKSPACE_KEY__",
+                "log_type": "SensorLogMQTT"
+              }
             }
           ]
         }
