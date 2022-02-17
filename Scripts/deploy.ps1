@@ -468,6 +468,7 @@ function New-ELMSEnvironment() {
 
     Write-Host
     Write-Host "Welcome to the MQTT Receiver for Log Streaming. This project implements an MQTT receiver for the IoT Edge Observability Agent that receives log messages from leaf devices and exports them to Azure Log Analytics."
+    Write-Host
     Write-Host "This deployment wizard will help you deploy a sandbox environment in your Azure subscription. The sandbox environment consists of an IoT Hub, a virtual machine configured as an IoT Edge device and a Log Analytics workspace. The purpose of the sandbox is to quickly show you how to use the MQTT Receiver for Log Streaming, and it helps you provision IoT leaf devices so you can connect to IoT Edge and send logs via MQTT."
     Write-Host
     Write-Host "Press Enter to continue."
@@ -817,9 +818,9 @@ function New-ELMSEnvironment() {
     #region start log-generator process
     Write-Host "`r`nRunning log generator process."
     az vm run-command invoke `
-    --resource-group $script:resource_group_name `
-    --name $script:vm_name `
-    --command-id RunShellScript --scripts "sudo /app/sensor/log-generator -f 5 &"
+        --resource-group $script:resource_group_name `
+        --name $script:vm_name `
+        --command-id RunShellScript --scripts "cd /app/sensor && sudo nohup ./log-generator -f 5 &"
     #endregion
 
     #region completion message
