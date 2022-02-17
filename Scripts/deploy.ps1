@@ -449,20 +449,8 @@ function New-ELMSEnvironment() {
     #region script variables
     Set-EnvironmentHash
 
-    $metrics_collector_message_id = "origin-iotedge-metrics-collector"
     $script:deployment_condition = "tags.mqttReceiver=true"
-    $script:device_query = "SELECT * FROM devices WHERE $($script:deployment_condition)"
-    $script:function_app_name = "iotedgelogsapp-$($script:env_hash)"
-    $script:logs_regex = "\b(WRN?|ERR?|CRIT?)\b"
-    $script:logs_since = "15m"
-    $script:logs_encoding = "gzip"
-    $script:metrics_encoding = "gzip"
-    $script:invoke_log_upload_function_name = "InvokeUploadModuleLogs"
-    $script:schedule_log_upload_function_name = "ScheduleUploadModuleLogs"
-    $script:alert_function_name = "MonitorAlerts"
-    $script:zip_package_name = "deploy.zip"
-    $script:zip_package_path = "$($root_path)/FunctionApp/FunctionApp/$($zip_package_name)"
-    $script:create_storage = $false
+    $script:create_storage = $true
     $script:create_event_grid = $false
     #endregion
 
@@ -476,13 +464,14 @@ function New-ELMSEnvironment() {
     Write-Host "#########################################"
     Write-Host "#########################################"
 
-    # Start-Sleep -Milliseconds 1500
+    Start-Sleep -Milliseconds 1500
 
-    # Write-Host
-    # Write-Host "Welcome to IoT ELMS (Edge Logging & Monitoring Solution). This deployment script will help you deploy IoT ELMS in your Azure subscription. It can be deployed as a sandbox environment, with a new IoT hub and a test IoT Edge device generating sample logs and collecting monitoring metrics, or it can connect to your existing IoT Hub and Log analytics workspace."
-    # Write-Host
-    # Write-Host "Press Enter to continue."
-    # Read-Host
+    Write-Host
+    Write-Host "Welcome to the MQTT Receiver for Log Streaming. This project implements an MQTT receiver for the IoT Edge Observability Agent that receives log messages from leaf devices and exports them to Azure Log Analytics."
+    Write-Host "This deployment wizard will help you deploy a sandbox environment in your Azure subscription. The sandbox environment consists of an IoT Hub, a virtual machine configured as an IoT Edge device and a Log Analytics workspace. The purpose of the sandbox is to quickly show you how to use the MQTT Receiver for Log Streaming, and it helps you provision IoT leaf devices so you can connect to IoT Edge and send logs via MQTT."
+    Write-Host
+    Write-Host "Press Enter to continue."
+    Read-Host
     #endregion
 
     #region validate CLI version
@@ -818,6 +807,7 @@ function New-ELMSEnvironment() {
 
     #region restart obsd module
     Write-Host "`r`nRestarting observability edge module."
+    Start-Sleep -Seconds 60
     az vm run-command invoke `
     --resource-group $script:resource_group_name `
     --name $script:vm_name `
