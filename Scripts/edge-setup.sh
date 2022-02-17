@@ -3,10 +3,12 @@
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --iotHubHostname)                  iotHubHostname="$2" ;;
+        --deviceHostname)                  deviceHostname="$2" ;;
         --deviceId)                        deviceId="$2" ;;
-        --certName)                        certName="$2" ;;
-        --keyName)                         keyName="$2" ;;
-        --caName)                          caName="$2" ;;
+        --deviceCaFile)                    deviceCaFile="$2" ;;
+        --devicePkFile)                    devicePkFile="$2" ;;
+        --rootCaFile)                      rootCaFile="$2" ;;
+        --connectionString)                connectionString="$2" ;;
         --logGenFileName)                  logGenFileName="$2" ;;
     esac
     shift
@@ -34,9 +36,9 @@ apt-get install -y aziot-edge
 echo "iotedge installed."
 
 echo "Installing CA root certificate..."
-cp $caName "$certdir/$caName.crt"
-cp $certName "$certdir/$certName.crt"
-cp $keyName "$certdir/$keyName.crt"
+cp $rootCaFile "$certdir/$rootCaFile.crt"
+cp $deviceCaFile "$certdir/$deviceCaFile.crt"
+cp $devicePkFile "$certdir/$devicePkFile.crt"
 update-ca-certificates
 chmod 644 $certdir/*crt
 echo "certificates installed."
@@ -45,20 +47,24 @@ echo "Initializing iotedge config file..."
 sleep 3
 file="/etc/aziot/config.toml"
 
+echo "hostname = \"$deviceHostname\"" >> $file
+echo "trust_bundle_cert = \"file://$certdir/$rootCaFile.crt\"" >> $file
 echo "" > $file
-echo "######################################################################" >> $file
-echo "# Manual x.509 cert provisioning configuration - added by edge-setup #" >> $file
-echo "######################################################################" >> $file
+echo "[edge]" >> $file
+echo "cert = \"file://$certdir/$deviceCaFile.crt\"" >> $file
+echo "pk = \"file://$certdir/$devicePkFile.crt\"" >> $file
+echo "" > $file
 echo "[provisioning]" >> $file
 echo "source = \"manual\"" >> $file
 echo "iothub_hostname = \"$iotHubHostname\"" >> $file
 echo "device_id = \"$deviceId\"" >> $file
+echo "" > $file
 echo "[provisioning.authentication]" >> $file
-echo "method = \"x509\"" >> $file
-echo "identity_cert = \"file://$certdir/$certName.crt\"" >> $file
-echo "identity_pk = \"file://$certdir/$keyName.crt\"" >> $file
-echo "trust_bundle_cert = \"file://$certdir/$caName.crt\"" >> $file
-echo "########################################################################" >> $file
+# echo "method = \"x509\"" >> $file
+# echo "identity_cert = \"file://$certdir/$deviceCaFile.crt\"" >> $file
+# echo "identity_pk = \"file://$certdir/$devicePkFile.crt\"" >> $file
+echo "method = \"symmetric_key\"" >> $file
+echo "connection_string = \"$connectionString\"" >> $file
 
 echo "iotedge provisioned."
 
