@@ -701,10 +701,9 @@ function New-ELMSEnvironment() {
             $root_cert_sas,
             $iotedge_key_sas,
             "$github_repo_url/$github_branch_name/Scripts/log-generator",
-            "$github_repo_url/$github_branch_name/Scripts/edge-setup.sh",
-            "$github_repo_url/$github_branch_name/Scripts/edge-setup.ps1"
+            "$github_repo_url/$github_branch_name/Scripts/edge-setup.sh"
         )
-        "commandToExecute" = "sudo bash edge-setup.sh --iotHubHostname '$($script:iot_hub_name).azure-devices.net' --deviceId '$script:vm_name' --certName '$iotedge_cert_name' --keyName '$iotedge_key_name' --caName '$root_cert_name' --logGenFileName log-generator"
+        "commandToExecute" = "sudo bash edge-setup.sh --iotHubHostname '$($script:iot_hub_name).azure-devices.net' --deviceId '$script:vm_name' --certName '$iotedge_cert_name' --keyName '$iotedge_key_name' --caName '$root_cert_name' --logGenFileName 'log-generator'"
     }
     Set-Content -Value (ConvertTo-Json $protected_settings | Out-String) -Path $protected_settings_path -Force
 
@@ -817,6 +816,14 @@ function New-ELMSEnvironment() {
         --target-condition=$script:deployment_condition | Out-Null
     #endregion
 
+    #region restart obsd module
+    Write-Host "`r`nRestarting observability edge module."
+    az vm run-command invoke `
+    --resource-group $script:resource_group_name `
+    --name $script:vm_name `
+    --command-id RunShellScript --scripts "sudo iotedge restart $obs_module_name"
+    #endregion
+
     #region start log-generator process
     Write-Host "`r`nRunning log generator process."
     az vm run-command invoke `
@@ -830,19 +837,13 @@ function New-ELMSEnvironment() {
     Write-Host -ForegroundColor Green "Resource Group: $($script:resource_group_name)"
     Write-Host -ForegroundColor Green "Environment unique id: $($script:env_hash)"
 
-    if ($script:create_iot_hub) {
-        Write-Host
-        Write-Host -ForegroundColor Green "IoT Edge VM Details:"
-        Write-Host -ForegroundColor Green "Username: $script:vm_username"
-        Write-Host -ForegroundColor Green "Password: $script:vm_password"
-        Write-Host -ForegroundColor Green "DNS: $($script:vm_name).$($script:iot_hub_location).cloudapp.azure.com"
-        Write-Host -ForegroundColor Green "Edge root CA certificate URL: $root_cert_sas"
-    }
-    else {
-        Write-Host
-        Write-Host -ForegroundColor Green "REMINDER: Update device twin for your IoT edge devices with `"$($script:deployment_condition)`" to apply the edge configuration."
-    }
-
+    Write-Host
+    Write-Host -ForegroundColor Green "IoT Edge VM Details:"
+    Write-Host -ForegroundColor Green "Username: $script:vm_username"
+    Write-Host -ForegroundColor Green "Password: $script:vm_password"
+    Write-Host -ForegroundColor Green "DNS: $($script:vm_name).$($script:iot_hub_location).cloudapp.azure.com"
+    Write-Host -ForegroundColor Green "Edge root CA certificate URL: $root_cert_sas"
+    
     if ($script:leaf_devices.Count -gt 0) {
         Write-Host
         Write-Host -ForegroundColor Green "IoT Leaf Devices Details:"

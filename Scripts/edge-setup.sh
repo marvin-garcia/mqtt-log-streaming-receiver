@@ -41,9 +41,25 @@ update-ca-certificates
 chmod 644 $certdir/*crt
 echo "certificates installed."
 
-echo "Provisioning iotedge..."
+echo "Initializing iotedge config file..."
 sleep 3
-pwsh -File $curdir/edge-setup.ps1 -iotHubHostname $iotHubHostname -deviceId $deviceId -certFile "$certdir/$certName.crt" -keyFile "$certdir/$keyName.crt"
+file="/etc/aziot/config.toml"
+
+echo "" > $file
+echo "######################################################################" >> $file
+echo "# Manual x.509 cert provisioning configuration - added by edge-setup #" >> $file
+echo "######################################################################" >> $file
+echo "[provisioning]" >> $file
+echo "source = \"manual\"" >> $file
+echo "iothub_hostname = \"$iotHubHostname\"" >> $file
+echo "device_id = \"$deviceId\"" >> $file
+echo "[provisioning.authentication]" >> $file
+echo "method = \"x509\"" >> $file
+echo "identity_cert = \"file://$certdir/$certName.crt\"" >> $file
+echo "identity_pk = \"file://$certdir/$keyName.crt\"" >> $file
+echo "trust_bundle_cert = \"file://$certdir/$caName.crt\"" >> $file
+echo "########################################################################" >> $file
+
 echo "iotedge provisioned."
 
 echo "Restarting iotedge runtime..."
