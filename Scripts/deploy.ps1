@@ -815,12 +815,14 @@ function New-ELMSEnvironment() {
         --hub-name $script:iot_hub_name `
         --content $deployment_manifest_path `
         --target-condition=$script:deployment_condition | Out-Null
+    #endregion
 
+    #region start log-generator process
     Write-Host "`r`nRunning log generator process."
     az vm run-command invoke `
     --resource-group $script:resource_group_name `
     --name $script:vm_name `
-    --command-id RunShellScript --scripts "/app/sensor/log-generator -f 5 &"
+    --command-id RunShellScript --scripts "sudo /app/sensor/log-generator -f 5 &"
     #endregion
 
     #region completion message
