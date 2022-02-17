@@ -130,8 +130,8 @@
               "export_frequency_in_seconds": 5,
               "run_time_seconds": 2,
               "conn_details": {
-                "workspace_id": "",
-                "shared_key": "",
+                "workspace_id": "__WORKSPACE_ID__",
+                "shared_key": "__WORKSPACE_SHARED_KEY__",
                 "log_type": "SensorLogFile"
               }
             }
