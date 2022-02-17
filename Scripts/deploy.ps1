@@ -591,7 +591,7 @@ function New-ELMSEnvironment() {
     
     New-CACertsCertChain rsa
     New-CACertsEdgeDeviceIdentity "$script:vm_name"
-    New-CACertsEdgeDevice "ca-cert"
+    New-CACertsEdgeDevice "$($script:vm_name)-ca"
     #endregion
 
     #region register edge device
@@ -808,11 +808,12 @@ function New-ELMSEnvironment() {
 
     #region restart obsd module
     Write-Host "`r`nRestarting observability edge module."
-    Start-Sleep -Seconds 60
+    Start-Sleep -Seconds 300
     az vm run-command invoke `
-    --resource-group $script:resource_group_name `
-    --name $script:vm_name `
-    --command-id RunShellScript --scripts "sudo iotedge restart $obs_module_name"
+        --resource-group $script:resource_group_name `
+        --name $script:vm_name `
+        --command-id RunShellScript `
+        --scripts "sudo iotedge restart $obs_module_name"
     #endregion
 
     #region start log-generator process
@@ -820,7 +821,18 @@ function New-ELMSEnvironment() {
     az vm run-command invoke `
         --resource-group $script:resource_group_name `
         --name $script:vm_name `
-        --command-id RunShellScript --scripts "cd /app/sensor && sudo nohup ./log-generator -f 5 &"
+        --command-id RunShellScript `
+        --scripts "cd /app/sensor; sudo nohup ./log-generator -f 5 &"
+    #endregion
+
+    #region restart obsd module
+    Write-Host "`r`nInitializing observability edge module."
+    Start-Sleep -Seconds 30
+    az vm run-command invoke `
+        --resource-group $script:resource_group_name `
+        --name $script:vm_name `
+        --command-id RunShellScript `
+        --scripts "sudo iotedge restart $obs_module_name"
     #endregion
 
     #region completion message
