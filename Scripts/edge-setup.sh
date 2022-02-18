@@ -47,23 +47,16 @@ echo "Initializing iotedge config file..."
 sleep 3
 file="/etc/aziot/config.toml"
 
+echo "" > $file
 echo "hostname = \"$deviceHostname\"" >> $file
 echo "trust_bundle_cert = \"file://$certdir/$rootCaFile.crt\"" >> $file
-echo "" > $file
-echo "[edge]" >> $file
+echo "" >> $file
+echo "[edge_ca]" >> $file
 echo "cert = \"file://$certdir/$deviceCaFile.crt\"" >> $file
 echo "pk = \"file://$certdir/$devicePkFile.crt\"" >> $file
-echo "" > $file
+echo "" >> $file
 echo "[provisioning]" >> $file
 echo "source = \"manual\"" >> $file
-echo "iothub_hostname = \"$iotHubHostname\"" >> $file
-echo "device_id = \"$deviceId\"" >> $file
-echo "" > $file
-echo "[provisioning.authentication]" >> $file
-# echo "method = \"x509\"" >> $file
-# echo "identity_cert = \"file://$certdir/$deviceCaFile.crt\"" >> $file
-# echo "identity_pk = \"file://$certdir/$devicePkFile.crt\"" >> $file
-echo "method = \"symmetric_key\"" >> $file
 echo "connection_string = \"$connectionString\"" >> $file
 
 echo "iotedge provisioned."

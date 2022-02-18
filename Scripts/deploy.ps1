@@ -588,30 +588,36 @@ function New-ELMSEnvironment() {
     #region generate edge certificates
     Set-Location "$root_path/Scripts/"
     Import-Module "$root_path/Scripts/ca-certs.ps1" -Force
+    $iotedge_device_ca_name = "$($script:vm_name)-ca"
     
     New-CACertsCertChain rsa
-    New-CACertsEdgeDeviceIdentity "$script:vm_name"
-    New-CACertsEdgeDevice "$($script:vm_name)-ca"
+    New-CACertsEdgeDevice $iotedge_device_ca_name
     #endregion
 
     #region register edge device
     $iotedge_container = "iotedgecerts"
     $root_cert_name = "azure-iot-test-only.root.ca.cert.pem"
     $root_cert_path = "$($root_path)/Scripts/certs/$($root_cert_name)"
-    $iotedge_cert_name = "iot-edge-device-identity-$($script:vm_name).cert.pem"
-    $iotedge_cert_path = "$($root_path)/Scripts/certs/$iotedge_cert_name"
-    $iotedge_key_name = "iot-edge-device-identity-$($script:vm_name).key.pem"
-    $iotedge_key_path = "$($root_path)/Scripts/private/$iotedge_key_name"
-    $thumbprint = $(openssl x509 -noout -fingerprint -inform pem -sha1 -in $iotedge_cert_path).Split('=')[1].Replace(':','').Trim()
 
+    $iotedge_cert_name = "iot-edge-device-$($script:vm_name)-ca-full-chain.cert.pem"
+    $iotedge_cert_path = "$($root_path)/Scripts/certs/$iotedge_cert_name"
+
+    $iotedge_key_name = "iot-edge-device-$($script:vm_name)-ca.key.pem"
+    $iotedge_key_path = "$($root_path)/Scripts/private/$iotedge_key_name"
+    
     Write-Host "Creating edge device."
     az iot hub device-identity create `
         --device-id $script:vm_name `
         --hub-name $script:iot_hub_name `
         --edge-enabled `
-        --auth-method x509_thumbprint `
-        --primary-thumbprint $thumbprint `
-        --secondary-thumbprint $thumbprint | Out-Null
+        --auth-method shared_private_key | Out-Null
+
+    $iotedge_conn_string = az iot hub device-identity connection-string show `
+        --device-id $script:vm_name `
+        --hub-name $script:iot_hub_name `
+        --auth-type key `
+        --key-type primary `
+        -o tsv
 
     az iot hub device-twin update `
         --device-id $script:vm_name `
@@ -684,6 +690,7 @@ function New-ELMSEnvironment() {
         -o tsv
 
     Write-Host "Registering iot edge device."
+    $iotedge_hostname = "$($script:vm_name).$($script:iot_hub_location).cloudapp.azure.com"
     $protected_settings_path = "$root_path/Scripts/vm-script.json"
     $protected_settings = @{
         "fileUris" = @(
@@ -693,7 +700,7 @@ function New-ELMSEnvironment() {
             "$github_repo_url/$github_branch_name/Scripts/log-generator",
             "$github_repo_url/$github_branch_name/Scripts/edge-setup.sh"
         )
-        "commandToExecute" = "sudo bash edge-setup.sh --iotHubHostname '$($script:iot_hub_name).azure-devices.net' --deviceId '$script:vm_name' --certName '$iotedge_cert_name' --keyName '$iotedge_key_name' --caName '$root_cert_name' --logGenFileName 'log-generator'"
+        "commandToExecute" = "sudo bash edge-setup.sh --iotHubHostname '$($script:iot_hub_name).azure-devices.net' --deviceHostname '$iotedge_hostname' --deviceId '$script:vm_name' --deviceCaFile '$iotedge_cert_name' --devicePkFile '$iotedge_key_name' --rootCaFile '$root_cert_name' --connectionString '$iotedge_conn_string' --logGenFileName 'log-generator'"
     }
     Set-Content -Value (ConvertTo-Json $protected_settings | Out-String) -Path $protected_settings_path -Force
 

@@ -25,3 +25,5 @@ Scripts/index.txt.attr.old
 Scripts/serial
 Scripts/serial.old
 Scripts/vm-script.json
+LeafDevice/
+Scripts/config.sample.toml
